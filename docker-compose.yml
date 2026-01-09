@@ -1,7 +1,7 @@
-version: '3.8'
+# Production - mit Traefik (extern) für SSL
+# Nutzung: docker compose up -d
 
 services:
-  # Icinga 2 Core Monitoring
   icinga2:
     image: icinga/icinga2:latest
     container_name: icinga2
@@ -12,7 +12,6 @@ services:
       - ICINGA_CN=icinga2
     volumes:
       - icinga2-data:/data
-      - ./config/icinga2:/data/etc/icinga2/conf.d/custom:ro
     networks:
       - icinga-network
     ports:
@@ -20,7 +19,6 @@ services:
     depends_on:
       - icingadb-redis
 
-  # IcingaDB Redis
   icingadb-redis:
     image: redis:7-alpine
     container_name: icingadb-redis
@@ -35,7 +33,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # IcingaDB
   icingadb:
     image: icinga/icingadb:latest
     container_name: icingadb
@@ -55,7 +52,6 @@ services:
       icingadb-redis:
         condition: service_healthy
 
-  # PostgreSQL Database
   postgres:
     image: postgres:15-alpine
     container_name: icinga-postgres
@@ -75,7 +71,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # Icinga Web 2
   icingaweb2:
     image: icinga/icingaweb2:latest
     container_name: icingaweb2
@@ -125,7 +120,6 @@ services:
       - icingadb
       - postgres
 
-  # Grafana für Visualisierung
   grafana:
     image: grafana/grafana:latest
     container_name: grafana
@@ -140,8 +134,7 @@ services:
       - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
       - GF_USERS_ALLOW_SIGN_UP=false
-      - GF_SERVER_ROOT_URL=${GRAFANA_ROOT_URL:-http://localhost:3000}
-      - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource
+      - GF_SERVER_ROOT_URL=https://grafana.florianbirkenberger.de
     volumes:
       - grafana-data:/var/lib/grafana
       - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
@@ -149,22 +142,20 @@ services:
     networks:
       - icinga-network
     depends_on:
-      - postgres
+      - prometheus
 
-  # InfluxDB für Metriken (Icinga2 Graphite/InfluxDB Writer)
-  influxdb:
-    image: influxdb:2.7-alpine
-    container_name: influxdb
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
     restart: unless-stopped
-    environment:
-      - DOCKER_INFLUXDB_INIT_MODE=setup
-      - DOCKER_INFLUXDB_INIT_USERNAME=${INFLUXDB_USER:-admin}
-      - DOCKER_INFLUXDB_INIT_PASSWORD=${INFLUXDB_PASSWORD:-influxdb123}
-      - DOCKER_INFLUXDB_INIT_ORG=${INFLUXDB_ORG:-icinga}
-      - DOCKER_INFLUXDB_INIT_BUCKET=${INFLUXDB_BUCKET:-icinga}
-      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${INFLUXDB_TOKEN:-icinga-monitoring-token}
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
     volumes:
-      - influxdb-data:/var/lib/influxdb2
+      - prometheus-data:/prometheus
+      - ./config/prometheus:/etc/prometheus:ro
     networks:
       - icinga-network
 
@@ -179,4 +170,4 @@ volumes:
   postgres-data:
   icingaweb2-data:
   grafana-data:
-  influxdb-data:
+  prometheus-data:

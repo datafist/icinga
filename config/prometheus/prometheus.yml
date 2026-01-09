@@ -1,0 +1,40 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+alerting:
+  alertmanagers: []
+
+rule_files: []
+
+scrape_configs:
+  # Prometheus selbst
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Icinga2 Metriken (falls API-Endpunkt verfügbar)
+  - job_name: 'icinga2'
+    static_configs:
+      - targets: ['icinga2:5665']
+    scheme: https
+    tls_config:
+      insecure_skip_verify: true
+    basic_auth:
+      username: root
+      password: icinga
+
+  # Grafana Metriken
+  - job_name: 'grafana'
+    static_configs:
+      - targets: ['grafana:3000']
+
+  # PostgreSQL (braucht postgres_exporter)
+  # - job_name: 'postgres'
+  #   static_configs:
+  #     - targets: ['postgres-exporter:9187']
+
+  # Node Exporter für Host-Metriken (optional)
+  # - job_name: 'node'
+  #   static_configs:
+  #     - targets: ['node-exporter:9100']
