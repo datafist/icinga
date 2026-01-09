@@ -1,0 +1,110 @@
+name: Deploy Icinga Stack
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  DOCKER_COMPOSE_VERSION: "2.24.0"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate Docker Compose
+        run: docker compose config --quiet
+
+      - name: Lint Dockerfile (if exists)
+        run: |
+          if [ -f Dockerfile ]; then
+            docker run --rm -i hadolint/hadolint < Dockerfile
+          fi
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH Key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Create deployment directory
+        run: |
+          ssh ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
+            "mkdir -p ~/icinga-monitoring"
+
+      - name: Copy files to server
+        run: |
+          rsync -avz --delete \
+            --exclude '.git' \
+            --exclude '.github' \
+            --exclude '.env' \
+            --exclude 'README.md' \
+            ./ ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:~/icinga-monitoring/
+
+      - name: Create .env file on server
+        run: |
+          ssh ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} << 'EOF'
+            cd ~/icinga-monitoring
+            cat > .env << ENVFILE
+          POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+          ICINGADB_PASSWORD=${{ secrets.ICINGADB_PASSWORD }}
+          ICINGAWEB_ADMIN_PASSWORD=${{ secrets.ICINGAWEB_ADMIN_PASSWORD }}
+          ICINGAWEB_DB_PASSWORD=${{ secrets.ICINGAWEB_DB_PASSWORD }}
+          ICINGA_API_PASSWORD=${{ secrets.ICINGA_API_PASSWORD }}
+          GRAFANA_ADMIN_USER=${{ secrets.GRAFANA_ADMIN_USER }}
+          GRAFANA_ADMIN_PASSWORD=${{ secrets.GRAFANA_ADMIN_PASSWORD }}
+          GRAFANA_ROOT_URL=${{ secrets.GRAFANA_ROOT_URL }}
+          INFLUXDB_USER=${{ secrets.INFLUXDB_USER }}
+          INFLUXDB_PASSWORD=${{ secrets.INFLUXDB_PASSWORD }}
+          INFLUXDB_ORG=${{ secrets.INFLUXDB_ORG }}
+          INFLUXDB_BUCKET=${{ secrets.INFLUXDB_BUCKET }}
+          INFLUXDB_TOKEN=${{ secrets.INFLUXDB_TOKEN }}
+          ENVFILE
+          EOF
+
+      - name: Deploy with Docker Compose
+        run: |
+          ssh ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} << 'EOF'
+            cd ~/icinga-monitoring
+            docker compose pull
+            docker compose up -d --remove-orphans
+            docker compose ps
+          EOF
+
+      - name: Health Check
+        run: |
+          sleep 30
+          ssh ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} << 'EOF'
+            cd ~/icinga-monitoring
+            # Check if all containers are running
+            RUNNING=$(docker compose ps --format json | jq -r '.State' | grep -c "running" || echo "0")
+            TOTAL=$(docker compose ps --format json | jq -r '.State' | wc -l)
+            echo "Running containers: $RUNNING / $TOTAL"
+            
+            if [ "$RUNNING" -lt "$TOTAL" ]; then
+              echo "Not all containers are running!"
+              docker compose logs --tail=50
+              exit 1
+            fi
+          EOF
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "Deployment failed! Check the logs above."
+          # Add notification logic here (Slack, Email, etc.)

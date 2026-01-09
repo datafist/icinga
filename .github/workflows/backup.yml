@@ -1,0 +1,58 @@
+name: Backup Icinga Data
+
+on:
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Setup SSH Key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Create Backup
+        run: |
+          ssh ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} << 'EOF'
+            cd ~/icinga-monitoring
+            BACKUP_DIR=~/backups/icinga
+            TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+            
+            mkdir -p $BACKUP_DIR
+            
+            # Backup PostgreSQL databases
+            docker compose exec -T postgres pg_dumpall -U icinga > $BACKUP_DIR/postgres_backup_$TIMESTAMP.sql
+            
+            # Backup volumes
+            docker run --rm \
+              -v icinga_icinga2-data:/data \
+              -v $BACKUP_DIR:/backup \
+              alpine tar czf /backup/icinga2_data_$TIMESTAMP.tar.gz -C /data .
+            
+            docker run --rm \
+              -v icinga_grafana-data:/data \
+              -v $BACKUP_DIR:/backup \
+              alpine tar czf /backup/grafana_data_$TIMESTAMP.tar.gz -C /data .
+            
+            # Compress SQL backup
+            gzip $BACKUP_DIR/postgres_backup_$TIMESTAMP.sql
+            
+            # Remove backups older than 7 days
+            find $BACKUP_DIR -type f -mtime +7 -delete
+            
+            echo "Backup completed: $TIMESTAMP"
+            ls -la $BACKUP_DIR
+          EOF
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "Backup failed! Check the logs above."

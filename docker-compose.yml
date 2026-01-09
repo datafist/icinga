@@ -1,0 +1,175 @@
+version: '3.8'
+
+services:
+  # Icinga 2 Core Monitoring
+  icinga2:
+    image: icinga/icinga2:latest
+    container_name: icinga2
+    hostname: icinga2
+    restart: unless-stopped
+    environment:
+      - ICINGA_MASTER=1
+      - ICINGA_CN=icinga2
+    volumes:
+      - icinga2-data:/data
+      - ./config/icinga2:/data/etc/icinga2/conf.d/custom:ro
+    networks:
+      - icinga-network
+    ports:
+      - "5665:5665"
+    depends_on:
+      - icingadb-redis
+
+  # IcingaDB Redis
+  icingadb-redis:
+    image: redis:7-alpine
+    container_name: icingadb-redis
+    restart: unless-stopped
+    volumes:
+      - redis-data:/data
+    networks:
+      - icinga-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # IcingaDB
+  icingadb:
+    image: icinga/icingadb:latest
+    container_name: icingadb
+    restart: unless-stopped
+    environment:
+      - ICINGADB_REDIS_HOST=icingadb-redis
+      - ICINGADB_DATABASE_HOST=postgres
+      - ICINGADB_DATABASE_TYPE=pgsql
+      - ICINGADB_DATABASE_DATABASE=icingadb
+      - ICINGADB_DATABASE_USER=icingadb
+      - ICINGADB_DATABASE_PASSWORD=${ICINGADB_PASSWORD:-icingadb}
+    networks:
+      - icinga-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      icingadb-redis:
+        condition: service_healthy
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: icinga-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=icinga
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-icinga}
+      - POSTGRES_DB=icinga
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./init-db:/docker-entrypoint-initdb.d:ro
+    networks:
+      - icinga-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U icinga"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Icinga Web 2
+  icingaweb2:
+    image: icinga/icingaweb2:latest
+    container_name: icingaweb2
+    restart: unless-stopped
+    environment:
+      - icingaweb.enabledModules=icingadb,incubator
+      - icingaweb.passwords.icingaweb2.icingaadmin=${ICINGAWEB_ADMIN_PASSWORD:-admin}
+      - icingaweb.authentication.icingaweb2.backend=db
+      - icingaweb.authentication.icingaweb2.resource=icingaweb_db
+      - icingaweb.config.global.config_backend=db
+      - icingaweb.config.global.config_resource=icingaweb_db
+      - icingaweb.config.logging.log=php
+      - icingaweb.groups.icingaweb2.backend=db
+      - icingaweb.groups.icingaweb2.resource=icingaweb_db
+      - icingaweb.resources.icingaweb_db.type=db
+      - icingaweb.resources.icingaweb_db.db=pgsql
+      - icingaweb.resources.icingaweb_db.host=postgres
+      - icingaweb.resources.icingaweb_db.dbname=icingaweb2
+      - icingaweb.resources.icingaweb_db.username=icingaweb2
+      - icingaweb.resources.icingaweb_db.password=${ICINGAWEB_DB_PASSWORD:-icingaweb2}
+      - icingaweb.resources.icingaweb_db.charset=utf8mb4
+      - icingaweb.modules.icingadb.config.icingadb.resource=icingadb
+      - icingaweb.modules.icingadb.redis.redis1.host=icingadb-redis
+      - icingaweb.modules.icingadb.commandtransports.icinga2.transport=api
+      - icingaweb.modules.icingadb.commandtransports.icinga2.host=icinga2
+      - icingaweb.modules.icingadb.commandtransports.icinga2.port=5665
+      - icingaweb.modules.icingadb.commandtransports.icinga2.username=root
+      - icingaweb.modules.icingadb.commandtransports.icinga2.password=${ICINGA_API_PASSWORD:-icinga}
+      - icingaweb.resources.icingadb.type=db
+      - icingaweb.resources.icingadb.db=pgsql
+      - icingaweb.resources.icingadb.host=postgres
+      - icingaweb.resources.icingadb.dbname=icingadb
+      - icingaweb.resources.icingadb.username=icingadb
+      - icingaweb.resources.icingadb.password=${ICINGADB_PASSWORD:-icingadb}
+    volumes:
+      - icingaweb2-data:/data
+    networks:
+      - icinga-network
+    ports:
+      - "8080:8080"
+    depends_on:
+      - icinga2
+      - icingadb
+      - postgres
+
+  # Grafana für Visualisierung
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_ROOT_URL=${GRAFANA_ROOT_URL:-http://localhost:3000}
+      - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./config/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    networks:
+      - icinga-network
+    ports:
+      - "3000:3000"
+    depends_on:
+      - postgres
+
+  # InfluxDB für Metriken (Icinga2 Graphite/InfluxDB Writer)
+  influxdb:
+    image: influxdb:2.7-alpine
+    container_name: influxdb
+    restart: unless-stopped
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=${INFLUXDB_USER:-admin}
+      - DOCKER_INFLUXDB_INIT_PASSWORD=${INFLUXDB_PASSWORD:-influxdb123}
+      - DOCKER_INFLUXDB_INIT_ORG=${INFLUXDB_ORG:-icinga}
+      - DOCKER_INFLUXDB_INIT_BUCKET=${INFLUXDB_BUCKET:-icinga}
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${INFLUXDB_TOKEN:-icinga-monitoring-token}
+    volumes:
+      - influxdb-data:/var/lib/influxdb2
+    networks:
+      - icinga-network
+    ports:
+      - "8086:8086"
+
+networks:
+  icinga-network:
+    driver: bridge
+
+volumes:
+  icinga2-data:
+  redis-data:
+  postgres-data:
+  icingaweb2-data:
+  grafana-data:
+  influxdb-data:

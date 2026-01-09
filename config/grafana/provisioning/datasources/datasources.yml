@@ -1,0 +1,28 @@
+apiVersion: 1
+
+datasources:
+  - name: InfluxDB
+    type: influxdb
+    access: proxy
+    url: http://influxdb:8086
+    jsonData:
+      version: Flux
+      organization: icinga
+      defaultBucket: icinga
+      tlsSkipVerify: true
+    secureJsonData:
+      token: icinga-monitoring-token
+    isDefault: true
+
+  - name: PostgreSQL-IcingaDB
+    type: postgres
+    url: postgres:5432
+    database: icingadb
+    user: icingadb
+    jsonData:
+      sslmode: disable
+      maxOpenConns: 10
+      maxIdleConns: 5
+      connMaxLifetime: 14400
+    secureJsonData:
+      password: icingadb
