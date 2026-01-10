@@ -34,6 +34,16 @@ Ein modernes, containerisiertes Monitoring-Setup mit Icinga 2, IcingaDB, Icinga 
 
 ## 🚀 Quick Start
 
+### ⚠️ Ist das Monitoring sofort startklar?
+
+**Nein.** Nach `docker compose up -d` muss **einmalig** das Init-Script ausgeführt werden:
+
+```bash
+./scripts/init-icinga.sh --dev   # oder --prod
+```
+
+Erst danach ist das Monitoring einsatzbereit.
+
 ### Voraussetzungen
 
 - Docker Engine 24+
@@ -80,18 +90,15 @@ Ein modernes, containerisiertes Monitoring-Setup mit Icinga 2, IcingaDB, Icinga 
    - ✅ IcingaDB Feature Aktivierung
    - ✅ Director-Datenbankmigrationen
    - ✅ Director-Kickstart
+   - ✅ **Host- und Service-Vorlagen erstellen**
    - ✅ Entfernung der Standard-Localhost-Checks
+   - ✅ Erstes Deployment
+
+   ⚠️ **Wichtig:** Ohne dieses Script funktioniert das Monitoring nicht!
 
 5. **Status prüfen:**
    ```bash
    docker compose ps
-   docker compose logs -f
-   ```
-
-5. **Status prüfen:**
-   ```bash
-   docker compose ps
-   docker compose logs -f
    ```
 
 ### Zugriff
@@ -116,7 +123,8 @@ icinga/
 ├── .gitignore
 ├── README.md
 ├── scripts/
-│   └── init-icinga.sh          # Initialisierungsscript (nach erstem Start)
+│   ├── init-icinga.sh          # Initialisierungsscript (nach erstem Start)
+│   └── director-deploy.sh      # Director Deploy Fix (bei hängendem Ausrollen)
 ├── init-db/
 │   └── 01-init-databases.sql   # PostgreSQL Datenbank-Initialisierung
 ├── config/
@@ -142,86 +150,11 @@ icinga/
 
 ## 🔧 Konfiguration
 
-### Icinga Director (GUI-basierte Konfiguration)
+**Hosts und Services:** [docs/HOST_HINZUFUEGEN.md](docs/HOST_HINZUFUEGEN.md)
 
-Der **Icinga Director** ist bereits aktiviert und ermöglicht die komfortable Verwaltung von Hosts, Services und Templates über die Weboberfläche - ideal für Teams mit mehreren Administratoren.
-
-#### Ersteinrichtung
-
-1. **Öffne Icinga Web 2:** http://localhost:8080
-2. **Navigiere zu:** Icinga Director → Kickstart Wizard
-3. **Führe den Kickstart durch:**
-   - Die API-Verbindung ist bereits vorkonfiguriert
-   - Der Wizard importiert vorhandene Icinga 2-Objekte
-
-#### Hosts über Director hinzufügen
-
-1. **Navigiere zu:** Icinga Director → Hosts → Add Host
-2. **Fülle die Pflichtfelder aus:**
-   - **Host name:** Eindeutiger Name (z.B. `webserver-01`)
-   - **Imports:** Wähle ein Host-Template (z.B. `generic-host`)
-   - **Host address:** IP-Adresse oder Hostname
-3. **Speichern** und **Deploy** klicken
-
-#### Services über Director hinzufügen
-
-1. **Navigiere zu:** Icinga Director → Services → Add Service
-2. **Konfiguriere:**
-   - **Service name:** Name des Checks
-   - **Imports:** Service-Template (z.B. `generic-service`)
-   - **Host:** Ziel-Host auswählen
-   - **Check command:** z.B. `http`, `ping`, `ssh`
-3. **Speichern** und **Deploy** klicken
-
-#### Änderungen deployen
-
-- Klicke auf **"Activity log"** → **"Deploy pending changes"**
-- Der Director generiert die Icinga 2-Konfiguration und wendet sie an
-- Alle Änderungen werden versioniert und sind nachvollziehbar
-
-### Manuelle Konfiguration (Alternative)
-
-Bearbeite `config/icinga2/hosts.conf`:
-
-```icinga
-object Host "webserver" {
-  import "generic-host"
-  address = "192.168.1.100"
-  vars.os = "Linux"
-  vars.http_vhosts["http"] = {
-    http_uri = "/"
-  }
-}
-```
-
-Nach Änderungen:
-```bash
-docker compose restart icinga2
-```
-
-### Grafana Dashboards
-
-Dashboards können unter `config/grafana/dashboards/` als JSON-Dateien abgelegt werden. Sie werden automatisch importiert.
+**Grafana Dashboards:** JSON-Dateien unter `config/grafana/dashboards/` werden automatisch importiert.
 
 ## 🚢 Deployment
-
-### GitHub Secrets konfigurieren
-
-Folgende Secrets müssen in GitHub konfiguriert werden:
-
-| Secret                    | Beschreibung                    |
-|---------------------------|---------------------------------|
-| `SSH_PRIVATE_KEY`         | SSH Key für Server-Zugriff      |
-| `DEPLOY_HOST`             | Server-Hostname oder IP         |
-| `DEPLOY_USER`             | SSH-Benutzer                    |
-| `POSTGRES_PASSWORD`       | PostgreSQL Passwort             |
-| `ICINGADB_PASSWORD`       | IcingaDB Passwort               |
-| `ICINGAWEB_ADMIN_PASSWORD`| Icinga Web Admin Passwort       |
-| `ICINGAWEB_DB_PASSWORD`   | Icinga Web DB Passwort          |
-| `ICINGA_API_PASSWORD`     | Icinga API Passwort             |
-| `GRAFANA_ADMIN_USER`      | Grafana Admin Benutzer          |
-| `GRAFANA_ADMIN_PASSWORD`  | Grafana Admin Passwort          |
-| `GRAFANA_ROOT_URL`        | Grafana Root URL                |
 
 ### Manuelles Deployment
 
@@ -232,18 +165,21 @@ cd ~/icinga-monitoring
 cp .env.example .env
 # .env anpassen
 docker compose up -d
+./scripts/init-icinga.sh --prod
 ```
 
 ## 🔄 Wartung
 
 ### Logs anzeigen
 ```bash
-docker compose logs -f [service-name]
+docker compose logs -f              # Alle Services
+docker compose logs -f icinga2      # Nur Icinga 2
+docker logs -f icinga2              # Live-Logs
 ```
 
 ### Container neustarten
 ```bash
-docker compose restart [service-name]
+docker compose restart icinga2
 ```
 
 ### Datenbank-Backup
@@ -259,27 +195,13 @@ docker compose up -d
 
 ## 🛠️ Troubleshooting
 
-### Container startet nicht
-```bash
-docker compose logs [service-name]
-docker compose ps
-```
-
-### Icinga Web zeigt keine Daten
-1. Prüfe IcingaDB-Verbindung zu Redis
-2. Prüfe PostgreSQL-Verbindung
-3. Logs checken: `docker compose logs icingadb icingaweb2`
-
-### Grafana zeigt keine Metriken
-1. Datasource-Konfiguration prüfen
-2. Prometheus-Verbindung testen: http://localhost:9090
-3. Netzwerk-Konnektivität testen: `docker compose logs prometheus`
+Siehe [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
 
 ## 📚 Dokumentation
 
+- [Host hinzufügen](docs/HOST_HINZUFUEGEN.md)
+- [Troubleshooting](docs/TROUBLESHOOTING.md)
 - [Icinga 2 Dokumentation](https://icinga.com/docs/icinga-2/latest/)
-- [IcingaDB Dokumentation](https://icinga.com/docs/icinga-db/latest/)
-- [Icinga Web 2 Dokumentation](https://icinga.com/docs/icinga-web/latest/)
 - [Grafana Dokumentation](https://grafana.com/docs/)
 
 ## 📄 Lizenz

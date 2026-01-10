@@ -236,7 +236,13 @@ EOF"
     docker exec icinga-postgres psql -U icinga -d director -c \
         "UPDATE icinga_apiuser SET password = '${API_PASSWORD}' WHERE object_name = 'root';" &>/dev/null || true
     
-    log_success "Director API-Credentials synchronisiert"
+    # Setze Director Deployment-Timeouts
+    docker exec icinga-postgres psql -U icinga -d director -c \
+        "INSERT INTO director_setting (setting_name, setting_value) VALUES ('deployment_timeout', '120') ON CONFLICT (setting_name) DO UPDATE SET setting_value = '120';" &>/dev/null || true
+    docker exec icinga-postgres psql -U icinga -d director -c \
+        "INSERT INTO director_setting (setting_name, setting_value) VALUES ('config_sync_timeout', '30') ON CONFLICT (setting_name) DO UPDATE SET setting_value = '30';" &>/dev/null || true
+    
+    log_success "Director API-Credentials und Timeouts synchronisiert"
 }
 
 # Deploye Director-Konfiguration
@@ -244,24 +250,68 @@ deploy_director_config() {
     log_info "Deploye Director-Konfiguration..."
     
     local output
-    output=$(docker exec icingaweb2 icingacli director config deploy 2>&1) || true
+    local retry=0
+    local max_retries=3
     
-    if echo "$output" | grep -q "has been deployed\|Nothing to deploy\|matches last deployed"; then
-        log_success "Director-Konfiguration deployed"
-    elif echo "$output" | grep -q "Unable to authenticate"; then
-        log_error "API-Authentifizierung fehlgeschlagen!"
-        log_info "Versuche Passwort in Director-DB zu korrigieren..."
-        docker exec icinga-postgres psql -U icinga -d director -c \
-            "UPDATE icinga_apiuser SET password = '${API_PASSWORD}' WHERE object_name = 'root';" &>/dev/null
-        # Retry
-        output=$(docker exec icingaweb2 icingacli director config deploy 2>&1) || true
+    while [ $retry -lt $max_retries ]; do
+        log_info "Deployment-Versuch $((retry + 1))/$max_retries..."
+        
+        # Deploy mit Timeout (max 60 Sekunden)
+        output=$(timeout 60 docker exec icingaweb2 icingacli director config deploy 2>&1) || true
+        
         if echo "$output" | grep -q "has been deployed\|Nothing to deploy\|matches last deployed"; then
-            log_success "Director-Konfiguration deployed (nach Fix)"
+            log_success "Director-Konfiguration deployed"
+            return 0
+        elif echo "$output" | grep -q "Unable to authenticate"; then
+            log_warn "API-Authentifizierung fehlgeschlagen, korrigiere Passwort..."
+            docker exec icinga-postgres psql -U icinga -d director -c \
+                "UPDATE icinga_apiuser SET password = '${API_PASSWORD}' WHERE object_name = 'root';" &>/dev/null
+            retry=$((retry + 1))
+            sleep 3
+        elif echo "$output" | grep -q "timeout\|timed out"; then
+            log_warn "Deployment-Timeout, Icinga 2 möglicherweise noch am Neustarten..."
+            retry=$((retry + 1))
+            sleep 5
         else
-            log_warn "Director-Deploy: $output"
+            log_warn "Director-Deploy Problem: $output"
+            retry=$((retry + 1))
+            sleep 3
         fi
+    done
+    
+    log_error "Director-Deploy fehlgeschlagen nach $max_retries Versuchen"
+    log_info "Du kannst das Deploy später manuell durchführen:"
+    log_info "  docker exec icingaweb2 icingacli director config deploy"
+}
+
+# Erstelle Director-Vorlagen (Templates)
+create_director_templates() {
+    log_info "Erstelle Director-Vorlagen..."
+    
+    # Host-Vorlage erstellen
+    local host_output
+    host_output=$(docker exec icingaweb2 icingacli director host create director-host \
+        --json '{"object_type":"template","check_command":"hostalive","check_interval":"60","retry_interval":"30","max_check_attempts":3}' 2>&1) || true
+    
+    if echo "$host_output" | grep -q "has been created"; then
+        log_success "Host-Vorlage 'director-host' erstellt"
+    elif echo "$host_output" | grep -q "already exists"; then
+        log_success "Host-Vorlage 'director-host' existiert bereits"
     else
-        log_warn "Director-Deploy: $output"
+        log_warn "Host-Vorlage: $host_output"
+    fi
+    
+    # Service-Vorlage erstellen
+    local service_output
+    service_output=$(docker exec icingaweb2 icingacli director service create director-service \
+        --json '{"object_type":"template","check_interval":"60","retry_interval":"30","max_check_attempts":3}' 2>&1) || true
+    
+    if echo "$service_output" | grep -q "has been created"; then
+        log_success "Service-Vorlage 'director-service' erstellt"
+    elif echo "$service_output" | grep -q "already exists"; then
+        log_success "Service-Vorlage 'director-service' existiert bereits"
+    else
+        log_warn "Service-Vorlage: $service_output"
     fi
 }
 
@@ -298,10 +348,12 @@ show_status() {
     echo ""
     echo -e "  ${BLUE}Login:${NC}         icingaadmin / admin"
     echo ""
-    echo -e "  ${YELLOW}Nächste Schritte:${NC}"
-    echo "  1. Öffne Icinga Web 2 und logge dich ein"
-    echo "  2. Gehe zu 'Icinga Director' → 'Host Templates' → 'Add'"
-    echo "  3. Erstelle Hosts und Services über den Director"
+    echo -e "  ${YELLOW}Vorlagen erstellt:${NC}"
+    echo "  - director-host (Host-Vorlage)"
+    echo "  - director-service (Service-Vorlage)"
+    echo ""
+    echo -e "  ${YELLOW}Nächster Schritt:${NC}"
+    echo "  Host hinzufügen: siehe docs/HOST_HINZUFUEGEN.md"
     echo ""
 }
 
@@ -333,6 +385,7 @@ main() {
     log_info "Konfiguriere Icinga Director..."
     run_director_migration
     run_director_kickstart
+    create_director_templates
     deploy_director_config
     
     show_status
