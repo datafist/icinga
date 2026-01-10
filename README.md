@@ -39,6 +39,7 @@ Ein modernes, containerisiertes Monitoring-Setup mit Icinga 2, IcingaDB, Icinga 
 - Docker Engine 24+
 - Docker Compose v2
 - Git
+- Bash (Linux/macOS/WSL)
 
 ### Installation
 
@@ -51,33 +52,40 @@ Ein modernes, containerisiertes Monitoring-Setup mit Icinga 2, IcingaDB, Icinga 
 2. **Umgebungsvariablen konfigurieren:**
    ```bash
    cp .env.example .env
-   # Passwörter in .env anpassen!
+   # Passwörter in .env anpassen (für Produktion!)
    nano .env
    ```
 
 3. **Stack starten:**
+
+   **Development:**
+   ```bash
+   docker compose -f docker-compose.dev.yml up -d
+   ```
+
+   **Production:**
    ```bash
    docker compose up -d
    ```
 
-4. **IcingaDB Feature aktivieren (einmalig nach erstem Start):**
+4. **Initialisierung ausführen (einmalig nach erstem Start):**
    ```bash
-   # IcingaDB Feature aktivieren
-   docker exec icinga2 icinga2 feature enable icingadb
-   
-   # IcingaDB Konfiguration anpassen
-   docker exec icinga2 bash -c 'cat > /data/etc/icinga2/features-enabled/icingadb.conf << EOF
-   object IcingaDB "icingadb" {
-     host = "icingadb-redis"
-     port = 6379
-   }
-   EOF'
-   
-   # Icinga 2 neustarten
-   docker restart icinga2
-   
-   # Director-Datenbank migrieren
-   docker exec icingaweb2 icingacli director migration run
+   ./scripts/init-icinga.sh --dev   # Für Development
+   # oder
+   ./scripts/init-icinga.sh --prod  # Für Production
+   ```
+
+   Das Script führt automatisch aus:
+   - ✅ API-User Konfiguration
+   - ✅ IcingaDB Feature Aktivierung
+   - ✅ Director-Datenbankmigrationen
+   - ✅ Director-Kickstart
+   - ✅ Entfernung der Standard-Localhost-Checks
+
+5. **Status prüfen:**
+   ```bash
+   docker compose ps
+   docker compose logs -f
    ```
 
 5. **Status prüfen:**
@@ -101,18 +109,23 @@ Ein modernes, containerisiertes Monitoring-Setup mit Icinga 2, IcingaDB, Icinga 
 
 ```
 icinga/
-├── docker-compose.yml          # Container-Konfiguration
+├── docker-compose.yml          # Production-Konfiguration (mit Traefik)
+├── docker-compose.dev.yml      # Development-Konfiguration (direkte Ports)
 ├── .env.example                # Beispiel-Umgebungsvariablen
 ├── .env                        # Aktuelle Umgebungsvariablen (nicht in Git)
 ├── .gitignore
 ├── README.md
+├── scripts/
+│   └── init-icinga.sh          # Initialisierungsscript (nach erstem Start)
 ├── init-db/
-│   └── 01-init-databases.sql   # Datenbank-Initialisierung
+│   └── 01-init-databases.sql   # PostgreSQL Datenbank-Initialisierung
 ├── config/
 │   ├── icinga2/
-│   │   ├── hosts.conf          # Host-Definitionen
-│   │   ├── services.conf       # Service-Checks
-│   │   └── notifications.conf  # Benachrichtigungen
+│   │   └── conf.d/             # Icinga 2 Konfiguration (optional)
+│   ├── icingaweb2/
+│   │   └── modules/director/   # Director-Konfiguration
+│   ├── prometheus/
+│   │   └── prometheus.yml      # Prometheus Scrape-Config
 │   └── grafana/
 │       ├── provisioning/
 │       │   ├── datasources/
