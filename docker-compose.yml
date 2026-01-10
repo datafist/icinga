@@ -12,6 +12,7 @@ services:
       - ICINGA_CN=icinga2
     volumes:
       - icinga2-data:/data
+      - ./config/icinga2/features/icingadb.conf:/etc/icinga2/features-enabled/icingadb.conf:ro
     networks:
       - icinga-network
     ports:
@@ -101,6 +102,7 @@ services:
       - icingaweb.resources.icingaweb_db.charset=UTF8
       - icingaweb.modules.icingadb.config.icingadb.resource=icingadb
       - icingaweb.modules.icingadb.redis.redis1.host=icingadb-redis
+      - icingaweb.modules.icingadb.redis.redis1.port=6379
       - icingaweb.modules.icingadb.commandtransports.icinga2.transport=api
       - icingaweb.modules.icingadb.commandtransports.icinga2.host=icinga2
       - icingaweb.modules.icingadb.commandtransports.icinga2.port=5665
@@ -112,6 +114,9 @@ services:
       - icingaweb.resources.icingadb.dbname=icingadb
       - icingaweb.resources.icingadb.username=icingadb
       - icingaweb.resources.icingadb.password=${ICINGADB_PASSWORD:-icingadb}
+      # Admin-Rolle mit vollen Berechtigungen
+      - icingaweb.roles.Administrators.users=icingaadmin
+      - icingaweb.roles.Administrators.permissions=*
     volumes:
       - icingaweb2-data:/data
     networks:

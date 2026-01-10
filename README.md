@@ -70,7 +70,7 @@ Ein modernes, containerisiertes Monitoring-Setup mit Icinga 2, IcingaDB, Icinga 
 
 | Service      | URL                        | Standard-Login        |
 |--------------|----------------------------|-----------------------|
-| Icinga Web 2 | http://localhost:8080      | `icingaadmin` / `icinga` |
+| Icinga Web 2 | http://localhost:8080      | `icingaadmin` / `admin` |
 | Grafana      | http://localhost:3000      | `admin` / `admin`     |
 | Prometheus   | http://localhost:9090      | *(kein Login)*        |
 | Icinga 2 API | https://localhost:5665     | `root` / `icinga`     |
