@@ -1,10 +1,11 @@
 name: Backup Icinga Data
 
+# Workflow ist vorübergehend deaktiviert (nur manueller Trigger)
 on:
-  schedule:
-    # Run daily at 2 AM UTC
-    - cron: '0 2 * * *'
   workflow_dispatch:
+  # schedule:
+  #   # Run daily at 2 AM UTC
+  #   - cron: '0 2 * * *'
 
 jobs:
   backup:

@@ -1,6 +1,6 @@
 # Icinga Monitoring Stack mit Grafana
 
-Ein modernes, containerisiertes Monitoring-Setup mit Icinga 2, IcingaDB, Icinga Web 2, Grafana und InfluxDB.
+Ein modernes, containerisiertes Monitoring-Setup mit Icinga 2, IcingaDB, Icinga Web 2, Grafana und Prometheus.
 
 ## 🏗️ Architektur
 
@@ -25,8 +25,8 @@ Ein modernes, containerisiertes Monitoring-Setup mit Icinga 2, IcingaDB, Icinga 
 │  └────────────┘                └─────┬─────┘                   │
 │                                      │                          │
 │                               ┌──────┴─────┐                   │
-│                               │  InfluxDB  │                   │
-│                               │   :8086    │                   │
+│                               │ Prometheus │                   │
+│                               │   :9090    │                   │
 │                               └────────────┘                   │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
@@ -68,12 +68,14 @@ Ein modernes, containerisiertes Monitoring-Setup mit Icinga 2, IcingaDB, Icinga 
 
 ### Zugriff
 
-| Service      | URL                        | Standard-Login    |
-|--------------|----------------------------|-------------------|
-| Icinga Web 2 | http://localhost:8080      | icingaadmin/admin |
-| Grafana      | http://localhost:3000      | admin/admin       |
-| InfluxDB     | http://localhost:8086      | admin/influxdb123 |
-| Icinga API   | https://localhost:5665     | root/icinga       |
+| Service      | URL                        | Standard-Login        |
+|--------------|----------------------------|-----------------------|
+| Icinga Web 2 | http://localhost:8080      | `icingaadmin` / `icinga` |
+| Grafana      | http://localhost:3000      | `admin` / `admin`     |
+| Prometheus   | http://localhost:9090      | *(kein Login)*        |
+| Icinga 2 API | https://localhost:5665     | `root` / `icinga`     |
+
+> **Hinweis:** Bei Grafana wirst du beim ersten Login aufgefordert, das Passwort zu ändern.
 
 ## 📁 Projektstruktur
 
@@ -150,11 +152,6 @@ Folgende Secrets müssen in GitHub konfiguriert werden:
 | `GRAFANA_ADMIN_USER`      | Grafana Admin Benutzer          |
 | `GRAFANA_ADMIN_PASSWORD`  | Grafana Admin Passwort          |
 | `GRAFANA_ROOT_URL`        | Grafana Root URL                |
-| `INFLUXDB_USER`           | InfluxDB Benutzer               |
-| `INFLUXDB_PASSWORD`       | InfluxDB Passwort               |
-| `INFLUXDB_ORG`            | InfluxDB Organisation           |
-| `INFLUXDB_BUCKET`         | InfluxDB Bucket                 |
-| `INFLUXDB_TOKEN`          | InfluxDB API Token              |
 
 ### Manuelles Deployment
 
@@ -205,8 +202,8 @@ docker compose ps
 
 ### Grafana zeigt keine Metriken
 1. Datasource-Konfiguration prüfen
-2. InfluxDB-Token validieren
-3. Netzwerk-Konnektivität testen
+2. Prometheus-Verbindung testen: http://localhost:9090
+3. Netzwerk-Konnektivität testen: `docker compose logs prometheus`
 
 ## 📚 Dokumentation
 

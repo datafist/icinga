@@ -39,6 +39,7 @@ services:
     restart: unless-stopped
     environment:
       - ICINGADB_REDIS_HOST=icingadb-redis
+      - ICINGADB_REDIS_PORT=6379
       - ICINGADB_DATABASE_HOST=postgres
       - ICINGADB_DATABASE_TYPE=pgsql
       - ICINGADB_DATABASE_DATABASE=icingadb
@@ -97,7 +98,7 @@ services:
       - icingaweb.resources.icingaweb_db.dbname=icingaweb2
       - icingaweb.resources.icingaweb_db.username=icingaweb2
       - icingaweb.resources.icingaweb_db.password=${ICINGAWEB_DB_PASSWORD:-icingaweb2}
-      - icingaweb.resources.icingaweb_db.charset=utf8mb4
+      - icingaweb.resources.icingaweb_db.charset=UTF8
       - icingaweb.modules.icingadb.config.icingadb.resource=icingadb
       - icingaweb.modules.icingadb.redis.redis1.host=icingadb-redis
       - icingaweb.modules.icingadb.commandtransports.icinga2.transport=api

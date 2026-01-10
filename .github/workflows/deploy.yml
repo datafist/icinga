@@ -1,10 +1,11 @@
 name: Deploy Icinga Stack
 
+# Workflow ist vorübergehend deaktiviert (nur manueller Trigger)
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
+  # push:
+  #   branches:
+  #     - main
 
 env:
   DOCKER_COMPOSE_VERSION: "2.24.0"
