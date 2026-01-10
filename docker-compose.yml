@@ -12,7 +12,7 @@ services:
       - ICINGA_CN=icinga2
     volumes:
       - icinga2-data:/data
-      - ./config/icinga2/features/icingadb.conf:/etc/icinga2/features-enabled/icingadb.conf:ro
+      # IcingaDB Feature wird nach dem Start aktiviert
     networks:
       - icinga-network
     ports:
@@ -84,7 +84,7 @@ services:
       - "traefik.http.routers.icingaweb.tls.certresolver=letsencrypt"
       - "traefik.http.services.icingaweb.loadbalancer.server.port=8080"
     environment:
-      - icingaweb.enabledModules=icingadb,incubator
+      - icingaweb.enabledModules=icingadb,incubator,director
       - icingaweb.passwords.icingaweb2.icingaadmin=${ICINGAWEB_ADMIN_PASSWORD:-admin}
       - icingaweb.authentication.icingaweb2.backend=db
       - icingaweb.authentication.icingaweb2.resource=icingaweb_db
@@ -114,6 +114,21 @@ services:
       - icingaweb.resources.icingadb.dbname=icingadb
       - icingaweb.resources.icingadb.username=icingadb
       - icingaweb.resources.icingadb.password=${ICINGADB_PASSWORD:-icingadb}
+      # Icinga Director Datenbank-Ressource
+      - icingaweb.resources.director_db.type=db
+      - icingaweb.resources.director_db.db=pgsql
+      - icingaweb.resources.director_db.host=postgres
+      - icingaweb.resources.director_db.dbname=director
+      - icingaweb.resources.director_db.username=director
+      - icingaweb.resources.director_db.password=${DIRECTOR_DB_PASSWORD:-director}
+      - icingaweb.resources.director_db.charset=UTF8
+      # Director Modul Konfiguration
+      - icingaweb.modules.director.config.db.resource=director_db
+      - icingaweb.modules.director.kickstart.config.endpoint=icinga2
+      - icingaweb.modules.director.kickstart.config.host=icinga2
+      - icingaweb.modules.director.kickstart.config.port=5665
+      - icingaweb.modules.director.kickstart.config.username=root
+      - icingaweb.modules.director.kickstart.config.password=${ICINGA_API_PASSWORD:-icinga}
       # Admin-Rolle mit vollen Berechtigungen
       - icingaweb.roles.Administrators.users=icingaadmin
       - icingaweb.roles.Administrators.permissions=*

@@ -60,7 +60,27 @@ Ein modernes, containerisiertes Monitoring-Setup mit Icinga 2, IcingaDB, Icinga 
    docker compose up -d
    ```
 
-4. **Status prüfen:**
+4. **IcingaDB Feature aktivieren (einmalig nach erstem Start):**
+   ```bash
+   # IcingaDB Feature aktivieren
+   docker exec icinga2 icinga2 feature enable icingadb
+   
+   # IcingaDB Konfiguration anpassen
+   docker exec icinga2 bash -c 'cat > /data/etc/icinga2/features-enabled/icingadb.conf << EOF
+   object IcingaDB "icingadb" {
+     host = "icingadb-redis"
+     port = 6379
+   }
+   EOF'
+   
+   # Icinga 2 neustarten
+   docker restart icinga2
+   
+   # Director-Datenbank migrieren
+   docker exec icingaweb2 icingacli director migration run
+   ```
+
+5. **Status prüfen:**
    ```bash
    docker compose ps
    docker compose logs -f
@@ -109,7 +129,44 @@ icinga/
 
 ## 🔧 Konfiguration
 
-### Hosts hinzufügen
+### Icinga Director (GUI-basierte Konfiguration)
+
+Der **Icinga Director** ist bereits aktiviert und ermöglicht die komfortable Verwaltung von Hosts, Services und Templates über die Weboberfläche - ideal für Teams mit mehreren Administratoren.
+
+#### Ersteinrichtung
+
+1. **Öffne Icinga Web 2:** http://localhost:8080
+2. **Navigiere zu:** Icinga Director → Kickstart Wizard
+3. **Führe den Kickstart durch:**
+   - Die API-Verbindung ist bereits vorkonfiguriert
+   - Der Wizard importiert vorhandene Icinga 2-Objekte
+
+#### Hosts über Director hinzufügen
+
+1. **Navigiere zu:** Icinga Director → Hosts → Add Host
+2. **Fülle die Pflichtfelder aus:**
+   - **Host name:** Eindeutiger Name (z.B. `webserver-01`)
+   - **Imports:** Wähle ein Host-Template (z.B. `generic-host`)
+   - **Host address:** IP-Adresse oder Hostname
+3. **Speichern** und **Deploy** klicken
+
+#### Services über Director hinzufügen
+
+1. **Navigiere zu:** Icinga Director → Services → Add Service
+2. **Konfiguriere:**
+   - **Service name:** Name des Checks
+   - **Imports:** Service-Template (z.B. `generic-service`)
+   - **Host:** Ziel-Host auswählen
+   - **Check command:** z.B. `http`, `ping`, `ssh`
+3. **Speichern** und **Deploy** klicken
+
+#### Änderungen deployen
+
+- Klicke auf **"Activity log"** → **"Deploy pending changes"**
+- Der Director generiert die Icinga 2-Konfiguration und wendet sie an
+- Alle Änderungen werden versioniert und sind nachvollziehbar
+
+### Manuelle Konfiguration (Alternative)
 
 Bearbeite `config/icinga2/hosts.conf`:
 
