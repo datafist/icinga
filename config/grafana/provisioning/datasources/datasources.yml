@@ -11,9 +11,9 @@ datasources:
   - name: PostgreSQL-IcingaDB
     type: postgres
     url: postgres:5432
-    database: icingadb
     user: icingadb
     jsonData:
+      database: icingadb
       sslmode: disable
       maxOpenConns: 10
       maxIdleConns: 5
