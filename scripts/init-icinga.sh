@@ -249,6 +249,11 @@ EOF"
 deploy_director_config() {
     log_info "Deploye Director-Konfiguration..."
     
+    # Warte zusätzlich auf API nach Neustart
+    log_info "Warte auf Icinga 2 API (nach Neustart)..."
+    sleep 5
+    wait_for_icinga2_api
+    
     local output
     local retry=0
     local max_retries=3
@@ -256,32 +261,37 @@ deploy_director_config() {
     while [ $retry -lt $max_retries ]; do
         log_info "Deployment-Versuch $((retry + 1))/$max_retries..."
         
-        # Deploy mit Timeout (max 60 Sekunden)
-        output=$(timeout 60 docker exec icingaweb2 icingacli director config deploy 2>&1) || true
+        # Deploy ohne timeout (macOS hat kein timeout)
+        output=$(docker exec icingaweb2 icingacli director config deploy 2>&1) || true
         
-        if echo "$output" | grep -q "has been deployed\|Nothing to deploy\|matches last deployed"; then
+        if echo "$output" | grep -qi "has been deployed\|Nothing to deploy\|matches last deployed\|Config matches"; then
             log_success "Director-Konfiguration deployed"
             return 0
-        elif echo "$output" | grep -q "Unable to authenticate"; then
+        elif echo "$output" | grep -qi "Unable to authenticate"; then
             log_warn "API-Authentifizierung fehlgeschlagen, korrigiere Passwort..."
             docker exec icinga-postgres psql -U icinga -d director -c \
                 "UPDATE icinga_apiuser SET password = '${API_PASSWORD}' WHERE object_name = 'root';" &>/dev/null
             retry=$((retry + 1))
-            sleep 3
-        elif echo "$output" | grep -q "timeout\|timed out"; then
-            log_warn "Deployment-Timeout, Icinga 2 möglicherweise noch am Neustarten..."
+            sleep 5
+        elif echo "$output" | grep -qi "timeout\|timed out"; then
+            log_warn "Deployment-Timeout, warte auf Icinga 2..."
+            retry=$((retry + 1))
+            sleep 10
+        else
+            # Wenn output leer oder unbekannt, zeige es an
+            if [ -n "$output" ]; then
+                log_warn "Unbekannte Antwort: $output"
+            fi
             retry=$((retry + 1))
             sleep 5
-        else
-            log_warn "Director-Deploy Problem: $output"
-            retry=$((retry + 1))
-            sleep 3
         fi
     done
     
     log_error "Director-Deploy fehlgeschlagen nach $max_retries Versuchen"
-    log_info "Du kannst das Deploy später manuell durchführen:"
+    log_info "Das ist oft nur ein Timing-Problem. Führe manuell aus:"
     log_info "  docker exec icingaweb2 icingacli director config deploy"
+    log_info ""
+    log_info "Das Monitoring sollte trotzdem funktionieren!"
 }
 
 # Erstelle Director-Vorlagen (Templates)
@@ -295,7 +305,7 @@ create_director_templates() {
     
     if echo "$host_output" | grep -q "has been created"; then
         log_success "Host-Vorlage 'director-host' erstellt"
-    elif echo "$host_output" | grep -q "already exists"; then
+    elif echo "$host_output" | grep -qE "already exists|DuplicateKeyException"; then
         log_success "Host-Vorlage 'director-host' existiert bereits"
     else
         log_warn "Host-Vorlage: $host_output"
@@ -308,7 +318,7 @@ create_director_templates() {
     
     if echo "$service_output" | grep -q "has been created"; then
         log_success "Service-Vorlage 'director-service' erstellt"
-    elif echo "$service_output" | grep -q "already exists"; then
+    elif echo "$service_output" | grep -qE "already exists|DuplicateKeyException"; then
         log_success "Service-Vorlage 'director-service' existiert bereits"
     else
         log_warn "Service-Vorlage: $service_output"
