@@ -41,6 +41,27 @@ Ein modernes, containerisiertes Monitoring-Setup mit Icinga 2, IcingaDB, Icinga 
 - Git
 - Bash (Linux/macOS/WSL)
 
+### TL;DR - Schnellstart (Lokal)
+
+```bash
+# 1. Repository klonen
+git clone git@github.com:datafist/icinga.git && cd icinga
+
+# 2. Env-Datei erstellen
+cp .env.example .env
+
+# 3. Container starten
+docker compose -f docker-compose.dev.yml up -d
+
+# 4. Warten bis alle Container laufen (ca. 30-60 Sekunden)
+docker compose -f docker-compose.dev.yml ps
+
+# 5. Initialisierung ausführen (WICHTIG - einmalig nach erstem Start!)
+./scripts/init-icinga.sh --dev
+
+# 6. Öffne http://localhost:8080 (Login: icingaadmin / admin)
+```
+
 ---
 
 ## 💻 Lokale Entwicklung
@@ -232,6 +253,39 @@ docker compose up -d
 
 > **Hinweis:** Bei Grafana wirst du beim ersten Login aufgefordert, das Passwort zu ändern.
 
+---
+
+## 🔄 Director Konfiguration deployen
+
+Wenn du Hosts oder Services im Director (Icinga Web 2) änderst, müssen diese Änderungen deployed werden.
+
+### Option 1: Über die Web-Oberfläche
+
+1. Gehe zu **Icinga Director** → **Konfiguration** → **Deployment**
+2. Klicke auf **Deploy**
+
+### Option 2: Per Kommandozeile
+
+```bash
+# Im Projektordner ausführen
+docker exec icingaweb2 icingacli director config deploy
+```
+
+### Bei Problemen mit dem Deployment
+
+Falls das Deployment im Web-Interface hängt oder fehlschlägt:
+
+```bash
+# Im Projektordner ausführen
+./scripts/director-deploy.sh
+```
+
+Dieses Script:
+- ✅ Prüft ob Icinga 2 Konfiguration valide ist
+- ✅ Prüft API-Erreichbarkeit
+- ✅ Passt Timeout-Einstellungen an
+- ✅ Führt Deployment mit Fehlerbehandlung aus
+
 ## 📁 Projektstruktur
 
 ```
@@ -243,8 +297,8 @@ icinga/
 ├── .gitignore
 ├── README.md
 ├── scripts/
-│   ├── init-icinga.sh          # Initialisierungsscript (nach erstem Start)
-│   └── director-deploy.sh      # Director Deploy Fix (bei hängendem Ausrollen)
+│   ├── init-icinga.sh          # Initialisierungsscript (einmalig nach erstem Start)
+│   └── director-deploy.sh      # Director Deploy (bei hängendem Deployment)
 ├── init-db/
 │   └── 01-init-databases.sql   # PostgreSQL Datenbank-Initialisierung
 ├── config/
