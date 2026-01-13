@@ -170,6 +170,53 @@ EOF'
     log_success "IcingaDB Feature aktiviert und konfiguriert"
 }
 
+# Korrigiere IcingaWeb2 Datenbank-Ressourcen
+configure_icingaweb2_resources() {
+    log_info "Konfiguriere IcingaWeb2 Datenbank-Ressourcen..."
+    
+    # IcingaWeb2 Image verwendet "postgres" als Standard-Hostname,
+    # aber unser Container heißt "icinga-postgres"
+    docker exec icingaweb2 bash -c 'cat > /etc/icingaweb2/resources.ini << EOF
+[director_db]
+type            = db
+db              = pgsql
+host            = icinga-postgres
+port            = 5432
+dbname          = director
+username        = icinga
+password        = icinga
+charset         = UTF8
+persistent      = 1
+connect_timeout = 10
+
+[icingaweb_db]
+type            = db
+db              = pgsql
+host            = icinga-postgres
+port            = 5432
+dbname          = icingaweb2
+username        = icinga
+password        = icinga
+charset         = UTF8
+persistent      = 1
+connect_timeout = 10
+
+[icingadb]
+type            = db
+db              = pgsql
+host            = icinga-postgres
+port            = 5432
+dbname          = icingadb
+username        = icinga
+password        = icinga
+charset         = UTF8
+persistent      = 1
+connect_timeout = 10
+EOF'
+    
+    log_success "IcingaWeb2 Datenbank-Ressourcen konfiguriert"
+}
+
 # Starte Icinga 2 neu falls nötig
 restart_icinga2_if_needed() {
     log_info "Prüfe ob Icinga 2 Neustart nötig..."
@@ -622,6 +669,10 @@ main() {
     remove_default_checks
     copy_custom_configs
     restart_icinga2_if_needed
+    
+    echo ""
+    log_info "Konfiguriere Icinga Web 2..."
+    configure_icingaweb2_resources
     
     echo ""
     log_info "Konfiguriere Icinga Director..."
