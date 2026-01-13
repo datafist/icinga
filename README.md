@@ -239,6 +239,7 @@ Das Script `./scripts/init-icinga.sh` muss **einmalig nach dem ersten Start** au
 - ✅ Startet Director-Kickstart
 - ✅ Erstellt Host- und Service-Vorlagen
 - ✅ Entfernt Standard-Localhost-Checks
+- ✅ Kopiert benutzerdefinierte Konfigurationsdateien (commands, templates, services, hosts)
 - ✅ Führt erstes Deployment durch
 
 ### Wann welche Compose-Datei?
@@ -303,7 +304,13 @@ icinga/
 │   └── 01-init-databases.sql   # PostgreSQL Datenbank-Initialisierung
 ├── config/
 │   ├── icinga2/
-│   │   └── conf.d/             # Icinga 2 Konfiguration (optional)
+│   │   ├── commands.conf       # Check-Kommandos (SNMP, Epiphan, Audio, etc.)
+│   │   ├── templates.conf      # Host- und Service-Templates
+│   │   ├── services.conf       # Service Apply Rules
+│   │   ├── hosts.conf          # Host-Definitionen (Beispiele)
+│   │   ├── notifications.conf  # Benachrichtigungskonfiguration
+│   │   ├── conf.d/             # Überschreibt Standard-Konfiguration
+│   │   └── features/           # IcingaDB Feature
 │   ├── icingaweb2/
 │   │   └── modules/director/   # Director-Konfiguration
 │   ├── prometheus/
@@ -323,6 +330,16 @@ icinga/
 ```
 
 ## 🔧 Konfiguration
+
+### Icinga2 Konfigurationsdateien
+
+| Datei | Beschreibung |
+|-------|--------------|
+| `commands.conf` | Benutzerdefinierte Check-Kommandos (SNMP, Epiphan, Dante, Shure) |
+| `templates.conf` | Host- und Service-Templates für verschiedene Gerätetypen |
+| `services.conf` | Service Apply Rules - welche Checks auf welche Hosts angewendet werden |
+| `hosts.conf` | Host-Definitionen mit Beispielen für alle Gerätetypen |
+| `notifications.conf` | Benachrichtigungen und User-Gruppen |
 
 **Hosts und Services:** [docs/HOST_HINZUFUEGEN.md](docs/HOST_HINZUFUEGEN.md)
 

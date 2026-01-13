@@ -294,55 +294,266 @@ deploy_director_config() {
     log_info "Das Monitoring sollte trotzdem funktionieren!"
 }
 
+# Hilfsfunktion: Erstelle Host-Template im Director
+create_host_template() {
+    local name=$1
+    local json=$2
+    local output
+    
+    output=$(docker exec icingaweb2 icingacli director host create "$name" --json "$json" 2>&1) || true
+    
+    if echo "$output" | grep -q "has been created"; then
+        log_success "Host-Vorlage '${name}' erstellt"
+    elif echo "$output" | grep -qE "already exists|DuplicateKeyException"; then
+        log_success "Host-Vorlage '${name}' existiert bereits"
+    else
+        log_warn "Host-Vorlage '${name}': $output"
+    fi
+}
+
+# Hilfsfunktion: Erstelle Service-Template im Director
+create_service_template() {
+    local name=$1
+    local json=$2
+    local output
+    
+    output=$(docker exec icingaweb2 icingacli director service create "$name" --json "$json" 2>&1) || true
+    
+    if echo "$output" | grep -q "has been created"; then
+        log_success "Service-Vorlage '${name}' erstellt"
+    elif echo "$output" | grep -qE "already exists|DuplicateKeyException"; then
+        log_success "Service-Vorlage '${name}' existiert bereits"
+    else
+        log_warn "Service-Vorlage '${name}': $output"
+    fi
+}
+
 # Erstelle Director-Vorlagen (Templates)
 create_director_templates() {
     log_info "Erstelle Director-Vorlagen..."
     
-    # Host-Vorlage erstellen
-    local host_output
-    host_output=$(docker exec icingaweb2 icingacli director host create director-host \
-        --json '{"object_type":"template","check_command":"hostalive","check_interval":"60","retry_interval":"30","max_check_attempts":3}' 2>&1) || true
+    # ═══════════════════════════════════════════════════════════════
+    # BASIS HOST-VORLAGEN
+    # ═══════════════════════════════════════════════════════════════
     
-    if echo "$host_output" | grep -q "has been created"; then
-        log_success "Host-Vorlage 'director-host' erstellt"
-    elif echo "$host_output" | grep -qE "already exists|DuplicateKeyException"; then
-        log_success "Host-Vorlage 'director-host' existiert bereits"
-    else
-        log_warn "Host-Vorlage: $host_output"
-    fi
+    create_host_template "director-host" \
+        '{"object_type":"template","check_command":"hostalive","check_interval":"60","retry_interval":"30","max_check_attempts":3}'
     
-    # Service-Vorlage erstellen
-    local service_output
-    service_output=$(docker exec icingaweb2 icingacli director service create director-service \
-        --json '{"object_type":"template","check_interval":"60","retry_interval":"30","max_check_attempts":3}' 2>&1) || true
+    # ═══════════════════════════════════════════════════════════════
+    # LINUX HOST-VORLAGE
+    # ═══════════════════════════════════════════════════════════════
     
-    if echo "$service_output" | grep -q "has been created"; then
-        log_success "Service-Vorlage 'director-service' erstellt"
-    elif echo "$service_output" | grep -qE "already exists|DuplicateKeyException"; then
-        log_success "Service-Vorlage 'director-service' existiert bereits"
-    else
-        log_warn "Service-Vorlage: $service_output"
-    fi
+    create_host_template "linux-host" \
+        '{"object_type":"template","imports":["director-host"],"check_command":"hostalive","vars":{"os":"Linux","enable_ssh":true,"enable_disk":true,"enable_load":true,"enable_procs":true,"enable_memory":true,"enable_users":true}}'
+    
+    # ═══════════════════════════════════════════════════════════════
+    # WINDOWS HOST-VORLAGEN
+    # ═══════════════════════════════════════════════════════════════
+    
+    create_host_template "windows-snmp-host" \
+        '{"object_type":"template","imports":["director-host"],"check_command":"hostalive","vars":{"os":"Windows","snmp_community":"public","snmp_version":"2c","enable_snmp_cpu":true,"enable_snmp_memory":true,"enable_snmp_disk":true,"enable_snmp_uptime":true,"enable_snmp_interfaces":true}}'
+    
+    # ═══════════════════════════════════════════════════════════════
+    # NETZWERK-GERÄTE VORLAGE
+    # ═══════════════════════════════════════════════════════════════
+    
+    create_host_template "network-device" \
+        '{"object_type":"template","imports":["director-host"],"check_command":"hostalive","vars":{"os":"Network","snmp_community":"public","snmp_version":"2c"}}'
+    
+    # ═══════════════════════════════════════════════════════════════
+    # BROADCAST/STREAMING GERÄTE (Radio/TV)
+    # ═══════════════════════════════════════════════════════════════
+    
+    create_host_template "broadcast-device" \
+        '{"object_type":"template","imports":["director-host"],"check_command":"hostalive","vars":{"os":"Broadcast","device_type":"broadcast"}}'
+    
+    # ═══════════════════════════════════════════════════════════════
+    # PEARL EPIPHAN GERÄTE
+    # ═══════════════════════════════════════════════════════════════
+    
+    create_host_template "epiphan-device" \
+        '{"object_type":"template","imports":["director-host"],"check_command":"hostalive","vars":{"os":"Epiphan","device_type":"epiphan","epiphan_api_port":80,"enable_epiphan_status":true,"enable_epiphan_channels":true,"enable_epiphan_recorder":true}}'
+    
+    # ═══════════════════════════════════════════════════════════════
+    # AUDIO-GERÄTE VORLAGEN
+    # ═══════════════════════════════════════════════════════════════
+    
+    create_host_template "audio-device" \
+        '{"object_type":"template","imports":["director-host"],"check_command":"hostalive","vars":{"os":"Audio","device_type":"audio"}}'
+    
+    create_host_template "dante-device" \
+        '{"object_type":"template","imports":["audio-device"],"check_command":"hostalive","vars":{"device_type":"dante","dante_port":4440,"enable_dante_network":true}}'
+    
+    create_host_template "wireless-microphone" \
+        '{"object_type":"template","imports":["audio-device"],"check_command":"hostalive","vars":{"device_type":"wireless-mic","enable_battery_check":true,"enable_rf_signal":true,"battery_warning":30,"battery_critical":10,"rf_warning":-70,"rf_critical":-80}}'
+    
+    # ═══════════════════════════════════════════════════════════════
+    # BASIS SERVICE-VORLAGEN
+    # ═══════════════════════════════════════════════════════════════
+    
+    create_service_template "director-service" \
+        '{"object_type":"template","check_interval":"60","retry_interval":"30","max_check_attempts":3}'
+    
+    create_service_template "critical-service" \
+        '{"object_type":"template","imports":["director-service"],"check_interval":"30","retry_interval":"10","max_check_attempts":5}'
+    
+    create_service_template "lowfreq-service" \
+        '{"object_type":"template","imports":["director-service"],"check_interval":"300","retry_interval":"60","max_check_attempts":3}'
+    
+    # ═══════════════════════════════════════════════════════════════
+    # LINUX SERVICE-VORLAGEN
+    # ═══════════════════════════════════════════════════════════════
+    
+    create_service_template "linux-ssh" \
+        '{"object_type":"template","imports":["director-service"],"check_command":"ssh"}'
+    
+    create_service_template "linux-disk" \
+        '{"object_type":"template","imports":["director-service"],"check_command":"disk","vars":{"disk_wfree":"20%","disk_cfree":"10%"}}'
+    
+    create_service_template "linux-load" \
+        '{"object_type":"template","imports":["director-service"],"check_command":"load","vars":{"load_wload1":"5","load_cload1":"10"}}'
+    
+    create_service_template "linux-memory" \
+        '{"object_type":"template","imports":["director-service"],"check_command":"swap"}'
+    
+    create_service_template "linux-procs" \
+        '{"object_type":"template","imports":["director-service"],"check_command":"procs"}'
+    
+    # ═══════════════════════════════════════════════════════════════
+    # WINDOWS SERVICE-VORLAGEN (SNMP)
+    # ═══════════════════════════════════════════════════════════════
+    
+    create_service_template "windows-cpu" \
+        '{"object_type":"template","imports":["director-service"],"check_command":"snmp","vars":{"snmp_oid":"1.3.6.1.2.1.25.3.3.1.2"}}'
+    
+    create_service_template "windows-memory" \
+        '{"object_type":"template","imports":["director-service"],"check_command":"snmp","vars":{"snmp_oid":"1.3.6.1.2.1.25.2.2"}}'
+    
+    create_service_template "windows-uptime" \
+        '{"object_type":"template","imports":["lowfreq-service"],"check_command":"snmp-uptime"}'
+    
+    # ═══════════════════════════════════════════════════════════════
+    # NETZWERK SERVICE-VORLAGEN
+    # ═══════════════════════════════════════════════════════════════
+    
+    create_service_template "http-check" \
+        '{"object_type":"template","imports":["director-service"],"check_command":"http"}'
+    
+    create_service_template "https-check" \
+        '{"object_type":"template","imports":["director-service"],"check_command":"http","vars":{"http_ssl":true}}'
+    
+    create_service_template "tcp-check" \
+        '{"object_type":"template","imports":["director-service"],"check_command":"tcp"}'
+    
+    create_service_template "ping-check" \
+        '{"object_type":"template","imports":["director-service"],"check_command":"ping4"}'
+    
+    # ═══════════════════════════════════════════════════════════════
+    # BROADCAST/STREAMING SERVICE-VORLAGEN
+    # ═══════════════════════════════════════════════════════════════
+    
+    create_service_template "icecast-check" \
+        '{"object_type":"template","imports":["critical-service"],"check_command":"http","vars":{"http_uri":"/status-json.xsl","http_string":"icestats"}}'
+    
+    create_service_template "stream-check" \
+        '{"object_type":"template","imports":["critical-service"],"check_command":"http"}'
+    
+    # ═══════════════════════════════════════════════════════════════
+    # APPLIKATIONS SERVICE-VORLAGEN
+    # ═══════════════════════════════════════════════════════════════
+    
+    create_service_template "vimp-check" \
+        '{"object_type":"template","imports":["critical-service"],"check_command":"http","vars":{"http_uri":"/api/health","http_ssl":true}}'
+    
+    create_service_template "panopto-check" \
+        '{"object_type":"template","imports":["critical-service"],"check_command":"http","vars":{"http_uri":"/Panopto/Pages/Home.aspx","http_ssl":true}}'
+    
+    create_service_template "mairlist-check" \
+        '{"object_type":"template","imports":["critical-service"],"check_command":"tcp","vars":{"tcp_port":9000}}'
+    
+    create_service_template "stereotool-check" \
+        '{"object_type":"template","imports":["critical-service"],"check_command":"tcp"}'
+    
+    create_service_template "micrompx-check" \
+        '{"object_type":"template","imports":["critical-service"],"check_command":"tcp"}'
+    
+    # ═══════════════════════════════════════════════════════════════
+    # AUDIO/VIDEO DEVICE SERVICE-VORLAGEN
+    # ═══════════════════════════════════════════════════════════════
+    
+    create_service_template "epiphan-webui" \
+        '{"object_type":"template","imports":["critical-service"],"check_command":"http","vars":{"http_uri":"/"}}'
+    
+    create_service_template "dante-check" \
+        '{"object_type":"template","imports":["critical-service"],"check_command":"tcp","vars":{"tcp_port":4440}}'
+    
+    create_service_template "mic-battery" \
+        '{"object_type":"template","imports":["critical-service"],"check_command":"snmp","vars":{"snmp_warn":"30:","snmp_crit":"10:"}}'
+    
+    create_service_template "process-check" \
+        '{"object_type":"template","imports":["critical-service"],"check_command":"procs","vars":{"procs_warning":"1:","procs_critical":"1:"}}'
+    
+    log_success "Alle Director-Vorlagen erstellt"
 }
 
 # Entferne Standard-Localhost-Checks
 remove_default_checks() {
     log_info "Entferne Standard-Localhost-Checks..."
     
-    # Prüfe ob bereits leer
-    local hosts_content
-    hosts_content=$(docker exec icinga2 cat /data/etc/icinga2/conf.d/hosts.conf 2>/dev/null || echo "")
+    # Die benutzerdefinierten Konfigurationsdateien ersetzen die Standard-Hosts/Services
+    # Diese werden über copy_custom_configs() kopiert
     
-    if echo "$hosts_content" | grep -q "Director\|Hosts werden über"; then
-        log_success "Standard-Checks bereits entfernt"
-        return 0
+    log_success "Standard-Checks werden durch benutzerdefinierte Konfiguration ersetzt"
+}
+
+# Kopiere benutzerdefinierte Konfigurationsdateien
+copy_custom_configs() {
+    log_info "Kopiere benutzerdefinierte Konfigurationsdateien..."
+    
+    local config_dir="${PROJECT_DIR}/config/icinga2"
+    # Icinga Docker Image lädt aus /etc/icinga2/conf.d (symlink nach /data/etc/icinga2/conf.d)
+    # Wir kopieren in beide Pfade um sicherzugehen
+    local icinga_conf_dir="/etc/icinga2/conf.d"
+    local icinga_data_dir="/data/etc/icinga2/conf.d"
+    
+    # Dateien die kopiert werden sollen
+    local config_files=("commands.conf" "templates.conf" "services.conf" "hosts.conf" "notifications.conf")
+    
+    for file in "${config_files[@]}"; do
+        if [[ -f "${config_dir}/${file}" ]]; then
+            docker cp "${config_dir}/${file}" "icinga2:${icinga_conf_dir}/${file}"
+            docker cp "${config_dir}/${file}" "icinga2:${icinga_data_dir}/${file}" 2>/dev/null || true
+            log_success "Kopiert: ${file}"
+        fi
+    done
+    
+    # Auch Dateien aus conf.d kopieren (falls vorhanden und nicht leer)
+    if [[ -d "${config_dir}/conf.d" ]]; then
+        for file in "${config_dir}/conf.d"/*.conf; do
+            if [[ -f "$file" ]]; then
+                local filename=$(basename "$file")
+                # Nur kopieren wenn nicht die leeren Platzhalter
+                if ! grep -q "Leere Datei\|werden über.*Director" "$file" 2>/dev/null; then
+                    docker cp "$file" "icinga2:${icinga_conf_dir}/${filename}"
+                    docker cp "$file" "icinga2:${icinga_data_dir}/${filename}" 2>/dev/null || true
+                    log_success "Kopiert: conf.d/${filename}"
+                fi
+            fi
+        done
     fi
     
-    # Leere die Dateien
-    docker exec icinga2 bash -c 'echo "// Hosts werden über Icinga Director verwaltet" > /data/etc/icinga2/conf.d/hosts.conf'
-    docker exec icinga2 bash -c 'echo "// Services werden über Icinga Director verwaltet" > /data/etc/icinga2/conf.d/services.conf'
+    # Features kopieren
+    if [[ -d "${config_dir}/features" ]]; then
+        for file in "${config_dir}/features"/*.conf; do
+            if [[ -f "$file" ]]; then
+                local filename=$(basename "$file")
+                docker cp "$file" "icinga2:/data/etc/icinga2/features-available/${filename}"
+                log_success "Kopiert: features/${filename}"
+            fi
+        done
+    fi
     
-    log_success "Standard-Localhost-Checks entfernt"
+    log_success "Benutzerdefinierte Konfiguration kopiert"
 }
 
 # Zeige Status
@@ -358,9 +569,29 @@ show_status() {
     echo ""
     echo -e "  ${BLUE}Login:${NC}         icingaadmin / admin"
     echo ""
-    echo -e "  ${YELLOW}Vorlagen erstellt:${NC}"
-    echo "  - director-host (Host-Vorlage)"
-    echo "  - director-service (Service-Vorlage)"
+    echo -e "  ${YELLOW}Host-Vorlagen erstellt:${NC}"
+    echo "  - director-host      (Basis-Vorlage)"
+    echo "  - linux-host         (Linux Server mit SSH, Disk, Load, etc.)"
+    echo "  - windows-snmp-host  (Windows Server via SNMP)"
+    echo "  - network-device     (Netzwerkgeräte via SNMP)"
+    echo "  - broadcast-device   (Radio/TV Encoder, Streaming)"
+    echo "  - epiphan-device     (Pearl Epiphan Encoder/Recorder)"
+    echo "  - audio-device       (Audio-Geräte Basis)"
+    echo "  - dante-device       (Dante Netzwerk-Audio)"
+    echo "  - wireless-microphone (Funkmikrofone mit Batterie/RF)"
+    echo ""
+    echo -e "  ${YELLOW}Service-Vorlagen erstellt:${NC}"
+    echo "  - director-service   (Basis-Vorlage)"
+    echo "  - critical-service   (Kritische Services, 30s Check)"
+    echo "  - lowfreq-service    (Seltene Checks, 5 Min.)"
+    echo "  - linux-ssh/disk/load/memory/procs"
+    echo "  - windows-cpu/memory/uptime"
+    echo "  - http-check, https-check, tcp-check, ping-check"
+    echo "  - icecast-check, stream-check"
+    echo "  - vimp-check, panopto-check, mairlist-check"
+    echo "  - stereotool-check, micrompx-check"
+    echo "  - epiphan-webui, dante-check, mic-battery"
+    echo "  - process-check"
     echo ""
     echo -e "  ${YELLOW}Nächster Schritt:${NC}"
     echo "  Host hinzufügen: siehe docs/HOST_HINZUFUEGEN.md"
@@ -389,6 +620,7 @@ main() {
     configure_api_user
     configure_icingadb
     remove_default_checks
+    copy_custom_configs
     restart_icinga2_if_needed
     
     echo ""
