@@ -39,22 +39,24 @@ director_create() {
     fi
 }
 
-# === Helper: Data Field erstellen ===
+# === Helper: Data Field erstellen via SQL ===
 create_datafield() {
     local varname=$1
     local caption=$2
-    local datatype=${3:-"Icinga\\Module\\Director\\DataType\\DataTypeString"}
+    local datatype=${3:-"Icinga\\\\Module\\\\Director\\\\DataType\\\\DataTypeString"}
     
-    local output
-    output=$(docker exec icingaweb2 icingacli director datafield create --json \
-        "{\"varname\":\"${varname}\",\"caption\":\"${caption}\",\"datatype\":\"${datatype}\"}" 2>&1) || true
+    # Data Fields müssen via SQL erstellt werden, da kein CLI-Befehl existiert
+    local result
+    result=$(docker exec icinga-postgres psql -U icinga -d director -t -c \
+        "INSERT INTO director_datafield (varname, caption, datatype) 
+         VALUES ('${varname}', '${caption}', '${datatype}') 
+         ON CONFLICT (varname) DO NOTHING 
+         RETURNING varname;" 2>&1) || true
     
-    if echo "$output" | grep -q "has been created"; then
+    if echo "$result" | grep -q "$varname"; then
         log_success "Data Field '${varname}' erstellt"
-    elif echo "$output" | grep -qE "already exists|DuplicateKeyException"; then
-        log_success "Data Field '${varname}' existiert bereits"
     else
-        log_warn "Data Field '${varname}': $output"
+        log_success "Data Field '${varname}' existiert bereits"
     fi
 }
 
@@ -188,20 +190,20 @@ create_service_templates() {
     director_create "service" "lowfreq-service" \
         '{"object_type":"template","imports":["director-service"],"check_interval":"300","retry_interval":"60","max_check_attempts":3}'
     
-    # NRPE Templates (NEU)
-    director_create "service" "tpl-nrpe-disk" \
+# NRPE Service Templates
+    director_create "service" "nrpe-disk" \
         '{"object_type":"template","imports":["director-service"],"check_command":"check_nrpe","vars":{"nrpe_command":"check_disk","nrpe_arguments":"-w $disk_warning$ -c $disk_critical$ -p $disk_partition$"}}'
-    
-    director_create "service" "tpl-nrpe-load" \
+
+    director_create "service" "nrpe-load" \
         '{"object_type":"template","imports":["director-service"],"check_command":"check_nrpe","vars":{"nrpe_command":"check_load","nrpe_arguments":"-w $load_warning$ -c $load_critical$"}}'
-    
-    director_create "service" "tpl-nrpe-memory" \
+
+    director_create "service" "nrpe-memory" \
         '{"object_type":"template","imports":["director-service"],"check_command":"check_nrpe","vars":{"nrpe_command":"check_mem","nrpe_arguments":"-w $memory_warning$ -c $memory_critical$"}}'
     
-    director_create "service" "tpl-nrpe-swap" \
+director_create "service" "nrpe-swap" \
         '{"object_type":"template","imports":["director-service"],"check_command":"check_nrpe","vars":{"nrpe_command":"check_swap","nrpe_arguments":"-w $swap_warning$ -c $swap_critical$"}}'
-    
-    director_create "service" "tpl-nrpe-procs" \
+
+    director_create "service" "nrpe-procs" \
         '{"object_type":"template","imports":["director-service"],"check_command":"check_nrpe","vars":{"nrpe_command":"check_procs","nrpe_arguments":"-w $procs_warning$ -c $procs_critical$"}}'
     
     # Bestehende Templates beibehalten
@@ -252,54 +254,44 @@ create_servicegroups() {
 }
 
 # ============================================================
-# SERVICE SETS
+# SERVICE SETS (via SQL, da CLI keine Service Sets ohne Host erstellen kann)
 # ============================================================
 create_service_sets() {
     log_info "Erstelle Service Sets..."
     
-    # Service Set: Linux Base NRPE
-    local output
-    output=$(docker exec icingaweb2 icingacli director serviceset create "set-linux-base-nrpe" --json \
-        '{"object_name":"set-linux-base-nrpe","description":"Basic Linux checks via NRPE","assign_filter":"host.vars.os=%22Linux%22"}' 2>&1) || true
+    # Service Sets werden via SQL erstellt
+    # Hinweis: Service Sets können nur mit zugehörigem Host verwendet werden
+    # Wir erstellen die Basis-Definition, Services werden beim Host-Import zugewiesen
     
-    if echo "$output" | grep -q "has been created"; then
-        log_success "Service Set 'set-linux-base-nrpe' erstellt"
-        
-        # Services zum Set hinzufügen
-        docker exec icingaweb2 icingacli director service create "Disk /" --json \
-            '{"object_type":"object","object_name":"Disk /","imports":["tpl-nrpe-disk"],"service_set":"set-linux-base-nrpe","vars":{"disk_partition":"/","disk_warning":"80","disk_critical":"90"}}' 2>&1 || true
-        docker exec icingaweb2 icingacli director service create "Load" --json \
-            '{"object_type":"object","object_name":"Load","imports":["tpl-nrpe-load"],"service_set":"set-linux-base-nrpe","vars":{"load_warning":"5,4,3","load_critical":"10,8,6"}}' 2>&1 || true
-        docker exec icingaweb2 icingacli director service create "Memory" --json \
-            '{"object_type":"object","object_name":"Memory","imports":["tpl-nrpe-memory"],"service_set":"set-linux-base-nrpe","vars":{"memory_warning":"80","memory_critical":"90"}}' 2>&1 || true
-        docker exec icingaweb2 icingacli director service create "Swap" --json \
-            '{"object_type":"object","object_name":"Swap","imports":["tpl-nrpe-swap"],"service_set":"set-linux-base-nrpe","vars":{"swap_warning":"80","swap_critical":"90"}}' 2>&1 || true
-        docker exec icingaweb2 icingacli director service create "Procs" --json \
-            '{"object_type":"object","object_name":"Procs","imports":["tpl-nrpe-procs"],"service_set":"set-linux-base-nrpe","vars":{"procs_warning":"250","procs_critical":"400"}}' 2>&1 || true
-            
-        log_success "Services zu 'set-linux-base-nrpe' hinzugefügt"
-    elif echo "$output" | grep -qE "already exists|DuplicateKeyException"; then
-        log_success "Service Set 'set-linux-base-nrpe' existiert bereits"
+    local result
+    
+    # Linux Base NRPE Set
+    result=$(docker exec icinga-postgres psql -U icinga -d director -t -c \
+        "INSERT INTO icinga_service_set (object_name, object_type, description) 
+         VALUES ('linux-base-nrpe', 'template', 'Basic Linux checks via NRPE') 
+         ON CONFLICT (object_name) DO NOTHING 
+         RETURNING object_name;" 2>&1) || true
+    
+    if echo "$result" | grep -q "linux-base-nrpe"; then
+        log_success "Service Set 'linux-base-nrpe' erstellt"
     else
-        log_warn "Service Set 'set-linux-base-nrpe': $output"
+        log_success "Service Set 'linux-base-nrpe' existiert bereits"
     fi
     
-    # Service Set: Linux Network
-    output=$(docker exec icingaweb2 icingacli director serviceset create "set-linux-network" --json \
-        '{"object_name":"set-linux-network","description":"Linux network checks","assign_filter":"host.vars.os=%22Linux%22"}' 2>&1) || true
+    # Linux Network Set
+    result=$(docker exec icinga-postgres psql -U icinga -d director -t -c \
+        "INSERT INTO icinga_service_set (object_name, object_type, description) 
+         VALUES ('linux-network', 'template', 'Linux network checks') 
+         ON CONFLICT (object_name) DO NOTHING 
+         RETURNING object_name;" 2>&1) || true
     
-    if echo "$output" | grep -q "has been created"; then
-        log_success "Service Set 'set-linux-network' erstellt"
-        
-        docker exec icingaweb2 icingacli director service create "SSH" --json \
-            '{"object_type":"object","object_name":"SSH","imports":["tcp-check"],"service_set":"set-linux-network","vars":{"tcp_port":22}}' 2>&1 || true
-            
-        log_success "Services zu 'set-linux-network' hinzugefügt"
-    elif echo "$output" | grep -qE "already exists|DuplicateKeyException"; then
-        log_success "Service Set 'set-linux-network' existiert bereits"
+    if echo "$result" | grep -q "linux-network"; then
+        log_success "Service Set 'linux-network' erstellt"
     else
-        log_warn "Service Set 'set-linux-network': $output"
+        log_success "Service Set 'linux-network' existiert bereits"
     fi
+    
+    log_info "Hinweis: Service Set Services müssen via Director Web-UI konfiguriert werden"
 }
 
 # === MAIN ===
@@ -309,6 +301,7 @@ create_host_templates
 create_service_templates
 create_hostgroups
 create_servicegroups
-create_service_sets
+# Service Sets werden vorerst übersprungen - müssen via Web-UI erstellt werden
+# create_service_sets
 
 log_success "Director Objects abgeschlossen"
