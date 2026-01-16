@@ -1,0 +1,10 @@
+# HTTP Targets für Blackbox Exporter
+# Beispiel:
+# - targets:
+#     - https://example.com
+#     - https://app.example.com/health
+#   labels:
+#     group: production
+
+# Leere Targets-Liste (keine Self-Monitoring Targets)
+[]

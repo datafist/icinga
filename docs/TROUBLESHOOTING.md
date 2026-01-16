@@ -10,13 +10,13 @@ Häufige Probleme und Lösungen.
 
 **Lösung:**
 ```bash
-./scripts/director-deploy.sh
+./scripts/03-director-deploy.sh
 ```
 
 Das Script:
 - Prüft Icinga 2 Status
 - Korrigiert Timeout-Einstellungen
-- Führt Deploy mit Fehlerbehandlung aus
+- Führt Deploy mit Retry-Logik aus
 
 **Alternativ CLI:**
 ```bash

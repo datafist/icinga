@@ -226,6 +226,15 @@ services:
     networks:
       - icinga-network
 
+  blackbox-exporter:
+    image: prom/blackbox-exporter:latest
+    container_name: blackbox-exporter
+    restart: unless-stopped
+    volumes:
+      - ./config/blackbox:/etc/blackbox_exporter:ro
+    networks:
+      - icinga-network
+
 networks:
   icinga-network:
     external: true

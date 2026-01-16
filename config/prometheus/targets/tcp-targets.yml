@@ -1,0 +1,10 @@
+# TCP Targets für Blackbox Exporter
+# Beispiel:
+# - targets:
+#     - server1.example.com:22
+#     - server2.example.com:3306
+#   labels:
+#     group: production
+
+# Leere Targets-Liste (keine Self-Monitoring Targets)
+[]

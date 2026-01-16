@@ -57,7 +57,7 @@ docker compose -f docker-compose.dev.yml up -d
 docker compose -f docker-compose.dev.yml ps
 
 # 5. Initialisierung ausführen (WICHTIG - einmalig nach erstem Start!)
-./scripts/init-icinga.sh --dev
+./scripts/init.sh
 
 # 6. Öffne http://localhost:8080 (Login: icingaadmin / admin)
 ```
@@ -93,10 +93,15 @@ Führe das Script **im Projektordner** aus (nicht im Container):
 
 ```bash
 # Im Projektordner (z.B. ~/icinga oder wo du das Repo geklont hast)
-./scripts/init-icinga.sh --dev
+./scripts/init.sh
 ```
 
-> ⚠️ **Wichtig:** Ohne dieses Script funktioniert das Monitoring nicht! Es konfiguriert API-User, aktiviert IcingaDB, führt Director-Migrationen durch und erstellt Vorlagen.
+Das Init-Skript führt 3 Teile aus:
+1. **01-director-kickstart.sh** - API-User, IcingaDB, Director-Migration
+2. **02-director-objects.sh** - Templates, Data Fields, Service Sets
+3. **03-director-deploy.sh** - Deployment der Konfiguration
+
+> ⚠️ **Wichtig:** Ohne dieses Script funktioniert das Monitoring nicht!
 
 ### Schritt 5: Zugriff testen
 
@@ -206,7 +211,7 @@ Führe das Script **im Projektordner auf dem Server** aus:
 
 ```bash
 # Im Projektordner ~/icinga-monitoring
-./scripts/init-icinga.sh --prod
+./scripts/init.sh
 ```
 
 #### 7. Status prüfen
@@ -231,16 +236,19 @@ docker compose logs -f
 
 ### Initialisierungs-Script
 
-Das Script `./scripts/init-icinga.sh` muss **einmalig nach dem ersten Start** ausgeführt werden. Es:
+Das Script `./scripts/init.sh` muss **einmalig nach dem ersten Start** ausgeführt werden. Es besteht aus 3 Teilen:
 
-- ✅ Konfiguriert API-User mit korrektem Passwort
-- ✅ Aktiviert IcingaDB Feature
-- ✅ Führt Director-Datenbankmigrationen durch
-- ✅ Startet Director-Kickstart
-- ✅ Erstellt Host- und Service-Vorlagen
-- ✅ Entfernt Standard-Localhost-Checks
-- ✅ Kopiert benutzerdefinierte Konfigurationsdateien (commands, templates, services, hosts)
-- ✅ Führt erstes Deployment durch
+| Teil | Script | Funktion |
+|------|--------|----------|
+| 1 | `01-director-kickstart.sh` | API-User, IcingaDB, Director-Migration & Kickstart |
+| 2 | `02-director-objects.sh` | Templates, Data Fields, Host/Service Groups, Service Sets |
+| 3 | `03-director-deploy.sh` | Director-Deployment mit Retry-Logik |
+
+**Optionen:**
+```bash
+./scripts/init.sh              # Vollständige Initialisierung
+./scripts/init.sh --skip-objects  # Nur Kickstart + Deploy (ohne Objekte)
+```
 
 ### Wann welche Compose-Datei?
 
@@ -277,15 +285,9 @@ docker exec icingaweb2 icingacli director config deploy
 Falls das Deployment im Web-Interface hängt oder fehlschlägt:
 
 ```bash
-# Im Projektordner ausführen
-./scripts/director-deploy.sh
+# Nur Deploy ausführen
+./scripts/03-director-deploy.sh
 ```
-
-Dieses Script:
-- ✅ Prüft ob Icinga 2 Konfiguration valide ist
-- ✅ Prüft API-Erreichbarkeit
-- ✅ Passt Timeout-Einstellungen an
-- ✅ Führt Deployment mit Fehlerbehandlung aus
 
 ## 📁 Projektstruktur
 
@@ -298,8 +300,10 @@ icinga/
 ├── .gitignore
 ├── README.md
 ├── scripts/
-│   ├── init-icinga.sh          # Initialisierungsscript (einmalig nach erstem Start)
-│   └── director-deploy.sh      # Director Deploy (bei hängendem Deployment)
+│   ├── init.sh                 # Runner-Skript (ruft 01/02/03 auf)
+│   ├── 01-director-kickstart.sh  # API-User, IcingaDB, Director-Setup
+│   ├── 02-director-objects.sh    # Templates, Data Fields, Service Sets
+│   └── 03-director-deploy.sh     # Director-Deployment
 ├── init-db/
 │   └── 01-init-databases.sql   # PostgreSQL Datenbank-Initialisierung
 ├── config/
@@ -314,7 +318,10 @@ icinga/
 │   ├── icingaweb2/
 │   │   └── modules/director/   # Director-Konfiguration
 │   ├── prometheus/
-│   │   └── prometheus.yml      # Prometheus Scrape-Config
+│   │   ├── prometheus.yml      # Prometheus Scrape-Config
+│   │   └── targets/            # Externe Targets (http, tcp, icmp)
+│   ├── blackbox/
+│   │   └── blackbox.yml        # Blackbox Exporter Module
 │   └── grafana/
 │       ├── provisioning/
 │       │   ├── datasources/
@@ -323,10 +330,10 @@ icinga/
 │       │       └── dashboards.yml
 │       └── dashboards/
 │           └── icinga-overview.json
-└── .github/
-    └── workflows/
-        ├── deploy.yml          # Deployment Pipeline
-        └── backup.yml          # Backup Pipeline
+└── docs/
+    ├── HOST_HINZUFUEGEN.md
+    ├── GRAFANA_DASHBOARD_HOWTO.md
+    └── TROUBLESHOOTING.md
 ```
 
 ## 🔧 Konfiguration

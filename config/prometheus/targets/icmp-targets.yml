@@ -1,0 +1,10 @@
+# ICMP (Ping) Targets für Blackbox Exporter
+# Beispiel:
+# - targets:
+#     - 192.168.1.1
+#     - router.example.com
+#   labels:
+#     group: network
+
+# Leere Targets-Liste (keine Self-Monitoring Targets)
+[]
