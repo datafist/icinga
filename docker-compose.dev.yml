@@ -12,10 +12,7 @@ services:
       - ICINGA_CN=icinga2
     volumes:
       - icinga2-data:/data
-      - ./config/icinga2/conf.d/api-users.conf:/data/etc/icinga2/conf.d/api-users.conf:ro
-      - ./config/icinga2/templates.conf:/data/etc/icinga2/conf.d/templates.conf:ro
-      - ./config/icinga2/services.conf:/data/etc/icinga2/conf.d/services.conf:ro
-      - ./config/icinga2/commands.conf:/data/etc/icinga2/conf.d/commands.conf:ro
+      # Custom configs werden per init.sh kopiert nach /data/etc/icinga2/conf.d/
     networks:
       - icinga-network
     ports:
