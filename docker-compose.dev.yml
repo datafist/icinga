@@ -129,7 +129,7 @@ services:
       - icingaweb.groups.icingaweb2.resource=icingaweb_db
       - icingaweb.resources.icingaweb_db.type=db
       - icingaweb.resources.icingaweb_db.db=pgsql
-      - icingaweb.resources.icingaweb_db.host=postgres
+      - icingaweb.resources.icingaweb_db.host=icinga-postgres
       - icingaweb.resources.icingaweb_db.dbname=icingaweb2
       - icingaweb.resources.icingaweb_db.username=icingaweb2
       - icingaweb.resources.icingaweb_db.password=${ICINGAWEB_DB_PASSWORD:-icingaweb2}
@@ -147,7 +147,7 @@ services:
       - icingaweb.modules.icingadb.commandtransports.icinga2.password=${ICINGA_API_PASSWORD:-icinga}
       - icingaweb.resources.icingadb.type=db
       - icingaweb.resources.icingadb.db=pgsql
-      - icingaweb.resources.icingadb.host=postgres
+      - icingaweb.resources.icingadb.host=icinga-postgres
       - icingaweb.resources.icingadb.dbname=icingadb
       - icingaweb.resources.icingadb.username=icingadb
       - icingaweb.resources.icingadb.password=${ICINGADB_PASSWORD:-icingadb}
@@ -157,7 +157,7 @@ services:
       # Icinga Director Datenbank-Ressource
       - icingaweb.resources.director_db.type=db
       - icingaweb.resources.director_db.db=pgsql
-      - icingaweb.resources.director_db.host=postgres
+      - icingaweb.resources.director_db.host=icinga-postgres
       - icingaweb.resources.director_db.dbname=director
       - icingaweb.resources.director_db.username=director
       - icingaweb.resources.director_db.password=${DIRECTOR_DB_PASSWORD:-director}
