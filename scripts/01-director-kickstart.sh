@@ -157,9 +157,59 @@ EOF"
     log_success "Director-Einstellungen synchronisiert"
 }
 
+# === Benutzerdefinierte Configs kopieren ===
+copy_custom_configs() {
+    log_info "Kopiere benutzerdefinierte Icinga 2 Konfiguration..."
+    
+    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    local config_dir="$(dirname "$script_dir")/config/icinga2"
+    
+    if [[ ! -d "$config_dir" ]]; then
+        log_warn "Config-Verzeichnis nicht gefunden: $config_dir"
+        return 0
+    fi
+    
+    # Hauptkonfigurationsdateien kopieren
+    local config_files=("commands.conf" "templates.conf" "services.conf" "hosts.conf" "notifications.conf")
+    
+    for file in "${config_files[@]}"; do
+        if [[ -f "${config_dir}/${file}" ]]; then
+            docker cp "${config_dir}/${file}" "icinga2:/data/etc/icinga2/conf.d/${file}"
+            log_success "Kopiert: ${file}"
+        fi
+    done
+    
+    # conf.d Unterverzeichnis (falls nicht-leere Dateien)
+    if [[ -d "${config_dir}/conf.d" ]]; then
+        for file in "${config_dir}/conf.d"/*.conf; do
+            if [[ -f "$file" ]]; then
+                local filename=$(basename "$file")
+                # Überspringe api-users.conf (wird separat verwaltet)
+                [[ "$filename" == "api-users.conf" ]] && continue
+                docker cp "$file" "icinga2:/data/etc/icinga2/conf.d/${filename}"
+                log_success "Kopiert: conf.d/${filename}"
+            fi
+        done
+    fi
+    
+    # Features kopieren
+    if [[ -d "${config_dir}/features" ]]; then
+        for file in "${config_dir}/features"/*.conf; do
+            if [[ -f "$file" ]]; then
+                local filename=$(basename "$file")
+                docker cp "$file" "icinga2:/data/etc/icinga2/features-available/${filename}"
+                log_success "Kopiert: features/${filename}"
+            fi
+        done
+    fi
+    
+    log_success "Benutzerdefinierte Konfiguration kopiert"
+}
+
 # === MAIN ===
 configure_api_user
 configure_icingadb
+copy_custom_configs
 restart_icinga2
 run_director_migration
 run_director_kickstart

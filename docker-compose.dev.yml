@@ -233,6 +233,19 @@ services:
     ports:
       - "9115:9115"
 
+  icinga2-exporter:
+    build: ./build/icinga2-exporter
+    container_name: icinga2-exporter
+    restart: unless-stopped
+    volumes:
+      - ./config/icinga2-exporter:/etc/icinga2-exporter:ro
+    networks:
+      - icinga-network
+    ports:
+      - "9638:9638"
+    depends_on:
+      - icinga2
+
 networks:
   icinga-network:
     driver: bridge

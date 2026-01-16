@@ -55,3 +55,9 @@ scrape_configs:
         target_label: instance
       - target_label: __address__
         replacement: blackbox-exporter:9115
+
+  # Icinga2 Exporter - Host und Service Metriken
+  - job_name: 'icinga2'
+    scrape_interval: 60s
+    static_configs:
+      - targets: ['icinga2-exporter:9638']

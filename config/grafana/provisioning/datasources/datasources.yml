@@ -10,6 +10,7 @@ datasources:
 
   - name: PostgreSQL-IcingaDB
     type: postgres
+    uid: icingadb
     url: postgres:5432
     user: icingadb
     jsonData:

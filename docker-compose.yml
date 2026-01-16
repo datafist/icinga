@@ -235,6 +235,17 @@ services:
     networks:
       - icinga-network
 
+  icinga2-exporter:
+    build: ./build/icinga2-exporter
+    container_name: icinga2-exporter
+    restart: unless-stopped
+    volumes:
+      - ./config/icinga2-exporter:/etc/icinga2-exporter:ro
+    networks:
+      - icinga-network
+    depends_on:
+      - icinga2
+
 networks:
   icinga-network:
     external: true

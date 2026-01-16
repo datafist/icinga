@@ -1,0 +1,29 @@
+# Icinga2 Exporter Runtime Configuration
+# Wird vom Container verwendet
+
+icinga2:
+  # URL zum Icinga2 Server
+  url: https://icinga2:5665
+  # Icinga2 API User
+  user: root
+  # Icinga2 API Password
+  passwd: icinga
+  # SSL Zertifikat verifizieren
+  verify: false
+  # Timeout in Sekunden
+  timeout: 5
+  # Prometheus Metrik-Prefix
+  metric_prefix: icinga2
+  # Host-Metadaten scrapen (state, state_type)
+  enable_scrape_metadata: true
+  # Threshold-Werte exportieren
+  enable_scrape_thresholds: false
+  
+  # Perfdata-Namen als Labels für bestimmte Check-Commands
+  perfnametolabel:
+    disk:
+      label_name: mount
+
+logger:
+  # Log-Level: DEBUG, INFO, WARNING, ERROR
+  level: INFO

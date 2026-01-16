@@ -1,0 +1,23 @@
+# Icinga2 Exporter Configuration
+# Diese Datei wird durch Umgebungsvariablen überschrieben
+
+icinga2:
+  host: icinga2
+  port: 5665
+  user: root
+  password: icinga
+  verify_ssl: false
+
+exporter:
+  port: 9150
+  host: 0.0.0.0
+
+# Metriken die exportiert werden
+metrics:
+  - name: icinga2_service_state
+    help: "Service state (0=OK, 1=WARNING, 2=CRITICAL, 3=UNKNOWN)"
+    type: gauge
+    
+  - name: icinga2_host_state
+    help: "Host state (0=UP, 1=DOWN, 2=UNREACHABLE)"
+    type: gauge
