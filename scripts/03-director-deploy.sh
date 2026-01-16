@@ -56,14 +56,21 @@ deploy_director_config() {
             sleep 5
             
             # Prüfe ob Director-Package eine aktive Stage hat
-            local active_stage
-            active_stage=$(curl -k -s -u "${API_USER}:${API_PASSWORD}" \
-                "https://localhost:5665/v1/config/packages" -H "Accept: application/json" 2>/dev/null | \
-                grep -o '"name":"director"[^}]*"active-stage":"[^"]*"' | grep -o '"active-stage":"[^"]*"' | cut -d'"' -f4)
+            local packages_json
+            packages_json=$(curl -k -s -u "${API_USER}:${API_PASSWORD}" \
+                "https://localhost:5665/v1/config/packages" -H "Accept: application/json" 2>/dev/null) || true
             
-            if [ -z "$active_stage" ] || [ "$active_stage" == "" ]; then
+            # Extrahiere active-stage für director package mit jq falls verfügbar, sonst grep
+            local active_stage=""
+            if command -v jq &>/dev/null; then
+                active_stage=$(echo "$packages_json" | jq -r '.results[] | select(.name=="director") | .["active-stage"]' 2>/dev/null) || true
+            else
+                active_stage=$(echo "$packages_json" | grep -o '"name":"director"[^}]*' | grep -o '"active-stage":"[^"]*"' | cut -d'"' -f4) || true
+            fi
+            
+            if [ -z "$active_stage" ] || [ "$active_stage" == "null" ]; then
                 log_warn "Director-Stage noch nicht aktiv, starte Icinga2 neu..."
-                docker restart icinga2
+                docker restart icinga2 || true
                 sleep 10
                 
                 # Aktualisiere Deployment-Status
@@ -71,6 +78,8 @@ deploy_director_config() {
                     "UPDATE director_deployment_log SET stage_collected = 'y', startup_succeeded = 'y' WHERE startup_succeeded IS NULL;" &>/dev/null || true
                 
                 log_success "Icinga2 neugestartet und Deployment-Status aktualisiert"
+            else
+                log_info "Director-Stage aktiv: $active_stage"
             fi
             
             return 0

@@ -12,7 +12,6 @@ services:
       - ICINGA_CN=icinga2
     volumes:
       - icinga2-data:/data
-      # Custom configs werden per init.sh kopiert nach /data/etc/icinga2/conf.d/
     networks:
       - icinga-network
     ports:

@@ -120,6 +120,22 @@ check_containers
 wait_for "PostgreSQL" "docker exec postgres pg_isready -U icinga 2>/dev/null || docker exec icinga-postgres pg_isready -U icinga"
 wait_for "Redis" "docker exec icingadb-redis redis-cli ping"
 wait_for "Icinga 2" "docker exec icinga2 icinga2 daemon -C"
+
+# Konfiguriere API-User mit bekanntem Passwort
+log_info "Konfiguriere API-User..."
+docker exec icinga2 sh -c "cat > /data/etc/icinga2/conf.d/api-users.conf << 'EOF'
+/**
+ * API User mit bekanntem Passwort für Director und Scripte
+ */
+object ApiUser \"root\" {
+  password = \"icinga\"
+  permissions = [ \"*\" ]
+}
+EOF"
+docker exec icinga2 icinga2 daemon -C &>/dev/null && docker exec icinga2 pkill -SIGHUP icinga2 || docker restart icinga2
+sleep 5
+log_success "API-User konfiguriert"
+
 wait_for "Icinga 2 API" "curl -k -s -o /dev/null -w '%{http_code}' -u ${ICINGA_API_USER}:${ICINGA_API_PASSWORD} https://localhost:5665/v1/status | grep -q 200"
 wait_for "IcingaWeb2" "curl -s -o /dev/null -w '%{http_code}' http://localhost:8080 | grep -qE '200|302'"
 
