@@ -4,16 +4,16 @@
   },
   "editable": true,
   "fiscalYearStartMonth": 0,
-  "graphTooltip": 0,
+  "graphTooltip": 1,
   "id": null,
   "links": [],
-  "liveNow": false,
+  "liveNow": true,
   "panels": [
     {
-      "gridPos": { "h": 3, "w": 24, "x": 0, "y": 0 },
+      "gridPos": { "h": 2, "w": 24, "x": 0, "y": 0 },
       "id": 1,
       "options": {
-        "content": "<div style=\"text-align: center; font-size: 24px; font-weight: bold; color: #fff; padding: 10px;\">\n  🎙️ Radio Studio - Infrastructure Monitor\n</div>",
+        "content": "<div style=\"text-align: center; font-size: 28px; font-weight: bold; color: #fff; background: linear-gradient(90deg, #1a1a2e 0%, #16213e 50%, #1a1a2e 100%); padding: 8px; border-radius: 4px;\">\n  🎙️ Radio Studio - Network Operations Center\n</div>",
         "mode": "html"
       },
       "title": "",
@@ -28,16 +28,16 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null }
+              { "color": "blue", "value": null }
             ]
           },
           "unit": "short"
         }
       },
-      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 3 },
+      "gridPos": { "h": 3, "w": 3, "x": 0, "y": 2 },
       "id": 2,
       "options": {
-        "colorMode": "value",
+        "colorMode": "background",
         "graphMode": "none",
         "justifyMode": "center",
         "orientation": "auto",
@@ -46,16 +46,16 @@
           "fields": "",
           "values": false
         },
-        "textMode": "value_and_name"
+        "textMode": "value"
       },
       "targets": [
         {
           "format": "table",
-          "rawSql": "SELECT COUNT(*) as \"Hosts Total\" FROM host_state WHERE state_type = 1",
+          "rawSql": "SELECT COUNT(*) FROM host_state WHERE state_type = 1",
           "refId": "A"
         }
       ],
-      "title": "Hosts Gesamt",
+      "title": "Hosts",
       "type": "stat"
     },
     {
@@ -71,10 +71,10 @@
           }
         }
       },
-      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 3 },
+      "gridPos": { "h": 3, "w": 3, "x": 3, "y": 2 },
       "id": 3,
       "options": {
-        "colorMode": "value",
+        "colorMode": "background",
         "graphMode": "none",
         "justifyMode": "center",
         "orientation": "auto",
@@ -87,11 +87,11 @@
       "targets": [
         {
           "format": "table",
-          "rawSql": "SELECT COUNT(*) as \"Hosts UP\" FROM host_state WHERE soft_state = 0 AND state_type = 1",
+          "rawSql": "SELECT COUNT(*) FROM host_state WHERE soft_state = 0 AND state_type = 1",
           "refId": "A"
         }
       ],
-      "title": "Hosts UP",
+      "title": "UP",
       "type": "stat"
     },
     {
@@ -102,15 +102,16 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null }
+              { "color": "red", "value": null },
+              { "color": "dark-green", "value": 0 }
             ]
           }
         }
       },
-      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 3 },
+      "gridPos": { "h": 3, "w": 3, "x": 6, "y": 2 },
       "id": 4,
       "options": {
-        "colorMode": "value",
+        "colorMode": "background",
         "graphMode": "none",
         "justifyMode": "center",
         "orientation": "auto",
@@ -123,11 +124,47 @@
       "targets": [
         {
           "format": "table",
-          "rawSql": "SELECT COUNT(*) as \"Hosts DOWN\" FROM host_state WHERE soft_state > 0 AND state_type = 1",
+          "rawSql": "SELECT COUNT(*) FROM host_state WHERE soft_state > 0 AND state_type = 1",
           "refId": "A"
         }
       ],
-      "title": "Hosts DOWN",
+      "title": "DOWN",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "icingadb" },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "blue", "value": null }
+            ]
+          }
+        }
+      },
+      "gridPos": { "h": 3, "w": 3, "x": 9, "y": 2 },
+      "id": 5,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        }
+      },
+      "targets": [
+        {
+          "format": "table",
+          "rawSql": "SELECT COUNT(*) FROM service_state WHERE state_type = 1",
+          "refId": "A"
+        }
+      ],
+      "title": "Services",
       "type": "stat"
     },
     {
@@ -143,46 +180,10 @@
           }
         }
       },
-      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 3 },
-      "id": 5,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "center",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": ["lastNotNull"],
-          "fields": "",
-          "values": false
-        }
-      },
-      "targets": [
-        {
-          "format": "table",
-          "rawSql": "SELECT COUNT(*) as \"Services OK\" FROM service_state WHERE soft_state = 0 AND state_type = 1",
-          "refId": "A"
-        }
-      ],
-      "title": "Services OK",
-      "type": "stat"
-    },
-    {
-      "datasource": { "type": "postgres", "uid": "icingadb" },
-      "fieldConfig": {
-        "defaults": {
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "yellow", "value": null }
-            ]
-          }
-        }
-      },
-      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 3 },
+      "gridPos": { "h": 3, "w": 3, "x": 12, "y": 2 },
       "id": 6,
       "options": {
-        "colorMode": "value",
+        "colorMode": "background",
         "graphMode": "none",
         "justifyMode": "center",
         "orientation": "auto",
@@ -195,11 +196,11 @@
       "targets": [
         {
           "format": "table",
-          "rawSql": "SELECT COUNT(*) as \"Services WARNING\" FROM service_state WHERE soft_state = 1 AND state_type = 1",
+          "rawSql": "SELECT COUNT(*) FROM service_state WHERE soft_state = 0 AND state_type = 1",
           "refId": "A"
         }
       ],
-      "title": "Services WARNING",
+      "title": "OK",
       "type": "stat"
     },
     {
@@ -210,15 +211,16 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null }
+              { "color": "yellow", "value": null },
+              { "color": "dark-green", "value": 0 }
             ]
           }
         }
       },
-      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 3 },
+      "gridPos": { "h": 3, "w": 3, "x": 15, "y": 2 },
       "id": 7,
       "options": {
-        "colorMode": "value",
+        "colorMode": "background",
         "graphMode": "none",
         "justifyMode": "center",
         "orientation": "auto",
@@ -231,12 +233,431 @@
       "targets": [
         {
           "format": "table",
-          "rawSql": "SELECT COUNT(*) as \"Services CRITICAL\" FROM service_state WHERE soft_state = 2 AND state_type = 1",
+          "rawSql": "SELECT COUNT(*) FROM service_state WHERE soft_state = 1 AND state_type = 1",
           "refId": "A"
         }
       ],
-      "title": "Services CRITICAL",
+      "title": "WARN",
       "type": "stat"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "icingadb" },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "dark-green", "value": 0 }
+            ]
+          }
+        }
+      },
+      "gridPos": { "h": 3, "w": 3, "x": 18, "y": 2 },
+      "id": 8,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        }
+      },
+      "targets": [
+        {
+          "format": "table",
+          "rawSql": "SELECT COUNT(*) FROM service_state WHERE soft_state = 2 AND state_type = 1",
+          "refId": "A"
+        }
+      ],
+      "title": "CRIT",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "icingadb" },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "percentage",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 95 },
+              { "color": "green", "value": 99 }
+            ]
+          },
+          "unit": "percentunit",
+          "max": 1,
+          "min": 0
+        }
+      },
+      "gridPos": { "h": 3, "w": 3, "x": 21, "y": 2 },
+      "id": 9,
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "targets": [
+        {
+          "format": "table",
+          "rawSql": "SELECT CAST(COUNT(*) FILTER (WHERE ss.soft_state = 0) AS FLOAT) / NULLIF(COUNT(*), 0) FROM service s JOIN service_state ss ON s.id = ss.service_id WHERE ss.state_type = 1",
+          "refId": "A"
+        }
+      ],
+      "title": "Health",
+      "type": "gauge"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+      "id": 10,
+      "panels": [],
+      "title": "📈 Performance & Trends (Prometheus)",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "gradientMode": "opacity",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "unit": "s"
+        }
+      },
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 6 },
+      "id": 11,
+      "options": {
+        "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "right", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "expr": "icinga2_ping_rta_seconds",
+          "legendFormat": "{{hostname}}",
+          "refId": "A"
+        }
+      ],
+      "title": "🌐 Ping Response Time (RTA)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "gradientMode": "opacity",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "unit": "percentunit"
+        }
+      },
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 6 },
+      "id": 12,
+      "options": {
+        "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "right", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "expr": "icinga2_ping_pl_ratio",
+          "legendFormat": "{{hostname}}",
+          "refId": "A"
+        }
+      ],
+      "title": "📉 Packet Loss",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 30,
+            "gradientMode": "opacity",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "line+area" }
+          },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 70 }, { "color": "red", "value": 90 }] },
+          "unit": "percent",
+          "max": 100
+        }
+      },
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 13 },
+      "id": 13,
+      "options": {
+        "legend": { "calcs": ["mean", "lastNotNull"], "displayMode": "table", "placement": "right", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "expr": "icinga2_load_load1",
+          "legendFormat": "{{hostname}} - 1m",
+          "refId": "A"
+        },
+        {
+          "expr": "icinga2_load_load5",
+          "legendFormat": "{{hostname}} - 5m",
+          "refId": "B"
+        }
+      ],
+      "title": "💻 System Load",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 30,
+            "gradientMode": "opacity",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "line+area" }
+          },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 80 }, { "color": "red", "value": 95 }] },
+          "unit": "percent",
+          "max": 100
+        }
+      },
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 13 },
+      "id": 14,
+      "options": {
+        "legend": { "calcs": ["mean", "lastNotNull"], "displayMode": "table", "placement": "right", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "expr": "icinga2_disk_percent{mount=\"/\"}",
+          "legendFormat": "{{hostname}} - /",
+          "refId": "A"
+        },
+        {
+          "expr": "icinga2_disk_percent{mount!=\"/\"}",
+          "legendFormat": "{{hostname}} - {{mount}}",
+          "refId": "B"
+        }
+      ],
+      "title": "💾 Disk Usage %",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 30,
+            "gradientMode": "opacity",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "line+area" }
+          },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 80 }, { "color": "red", "value": 95 }] },
+          "unit": "percent",
+          "max": 100
+        }
+      },
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 13 },
+      "id": 15,
+      "options": {
+        "legend": { "calcs": ["mean", "lastNotNull"], "displayMode": "table", "placement": "right", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "expr": "icinga2_memory_percent",
+          "legendFormat": "{{hostname}}",
+          "refId": "A"
+        }
+      ],
+      "title": "🧠 Memory Usage %",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 20 },
+      "id": 20,
+      "panels": [],
+      "title": "🔍 HTTP/TCP Probe Status (Blackbox Exporter)",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "custom": {
+            "align": "left",
+            "displayMode": "color-background-solid",
+            "inspect": false
+          },
+          "mappings": [
+            { "options": { "0": { "color": "red", "index": 1, "text": "❌ DOWN" } }, "type": "value" },
+            { "options": { "1": { "color": "green", "index": 0, "text": "✅ UP" } }, "type": "value" }
+          ],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] }
+        },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "instance" }, "properties": [{ "id": "custom.width", "value": 250 }] },
+          { "matcher": { "id": "byName", "options": "Value" }, "properties": [{ "id": "custom.width", "value": 100 }] }
+        ]
+      },
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 21 },
+      "id": 21,
+      "options": { "showHeader": true, "cellHeight": "sm", "footer": { "show": false } },
+      "targets": [
+        {
+          "expr": "probe_success",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "",
+          "refId": "A"
+        }
+      ],
+      "title": "🌐 HTTP/TCP Probe Status",
+      "transformations": [
+        { "id": "filterFieldsByName", "options": { "include": { "names": ["instance", "Value"] } } }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "unit": "s"
+        }
+      },
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 21 },
+      "id": 22,
+      "options": {
+        "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "right", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "expr": "probe_duration_seconds",
+          "legendFormat": "{{instance}}",
+          "refId": "A"
+        }
+      ],
+      "title": "⏱️ HTTP Response Time",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 27 },
+      "id": 30,
+      "panels": [],
+      "title": "⚠️ Aktuelle Probleme & Status",
+      "type": "row"
     },
     {
       "datasource": { "type": "postgres", "uid": "icingadb" },
@@ -252,46 +673,25 @@
             { "options": { "1": { "color": "red", "index": 1, "text": "DOWN" } }, "type": "value" },
             { "options": { "2": { "color": "orange", "index": 2, "text": "UNREACHABLE" } }, "type": "value" }
           ],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null }
-            ]
-          }
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
         },
         "overrides": [
-          {
-            "matcher": { "id": "byName", "options": "Host" },
-            "properties": [
-              { "id": "custom.width", "value": 200 }
-            ]
-          },
-          {
-            "matcher": { "id": "byName", "options": "Gruppe" },
-            "properties": [
-              { "id": "custom.width", "value": 150 }
-            ]
-          }
+          { "matcher": { "id": "byName", "options": "Host" }, "properties": [{ "id": "custom.width", "value": 180 }] },
+          { "matcher": { "id": "byName", "options": "Gruppe" }, "properties": [{ "id": "custom.width", "value": 140 }] },
+          { "matcher": { "id": "byName", "options": "Status" }, "properties": [{ "id": "custom.width", "value": 80 }] }
         ]
       },
-      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 7 },
-      "id": 8,
-      "options": {
-        "showHeader": true,
-        "cellHeight": "sm",
-        "footer": { "show": false },
-        "sortBy": [
-          { "desc": false, "displayName": "Gruppe" }
-        ]
-      },
+      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 28 },
+      "id": 31,
+      "options": { "showHeader": true, "cellHeight": "sm", "footer": { "show": false }, "sortBy": [{ "desc": false, "displayName": "Gruppe" }] },
       "targets": [
         {
           "format": "table",
-          "rawSql": "SELECT \n  h.display_name as \"Host\",\n  COALESCE(hg.display_name, 'Ungroupiert') as \"Gruppe\",\n  hs.soft_state as \"Status\",\n  hs.output as \"Output\"\nFROM host h\nJOIN host_state hs ON h.id = hs.host_id\nLEFT JOIN hostgroup_member hgm ON h.id = hgm.host_id\nLEFT JOIN hostgroup hg ON hgm.hostgroup_id = hg.id\nWHERE hs.state_type = 1\nORDER BY hg.display_name, h.display_name",
+          "rawSql": "SELECT h.display_name as \"Host\", COALESCE(hg.display_name, 'Andere') as \"Gruppe\", hs.soft_state as \"Status\", LEFT(hs.output, 60) as \"Output\" FROM host h JOIN host_state hs ON h.id = hs.host_id LEFT JOIN hostgroup_member hgm ON h.id = hgm.host_id LEFT JOIN hostgroup hg ON hgm.hostgroup_id = hg.id WHERE hs.state_type = 1 ORDER BY hs.soft_state DESC, hg.display_name, h.display_name",
           "refId": "A"
         }
       ],
-      "title": "🖥️ Host-Status nach Gruppe",
+      "title": "🖥️ Host-Status",
       "type": "table"
     },
     {
@@ -308,209 +708,42 @@
             { "options": { "2": { "color": "red", "index": 1, "text": "CRITICAL" } }, "type": "value" },
             { "options": { "3": { "color": "purple", "index": 2, "text": "UNKNOWN" } }, "type": "value" }
           ],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "yellow", "value": null }
-            ]
-          }
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "yellow", "value": null }] }
         },
         "overrides": [
-          {
-            "matcher": { "id": "byName", "options": "Host" },
-            "properties": [
-              { "id": "custom.width", "value": 150 }
-            ]
-          },
-          {
-            "matcher": { "id": "byName", "options": "Service" },
-            "properties": [
-              { "id": "custom.width", "value": 150 }
-            ]
-          },
-          {
-            "matcher": { "id": "byName", "options": "Seit" },
-            "properties": [
-              { "id": "custom.width", "value": 120 }
-            ]
-          }
+          { "matcher": { "id": "byName", "options": "Host" }, "properties": [{ "id": "custom.width", "value": 140 }] },
+          { "matcher": { "id": "byName", "options": "Service" }, "properties": [{ "id": "custom.width", "value": 140 }] },
+          { "matcher": { "id": "byName", "options": "Status" }, "properties": [{ "id": "custom.width", "value": 80 }] },
+          { "matcher": { "id": "byName", "options": "Seit" }, "properties": [{ "id": "custom.width", "value": 100 }] }
         ]
       },
-      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 7 },
-      "id": 9,
-      "options": {
-        "showHeader": true,
-        "cellHeight": "sm",
-        "footer": { "show": false },
-        "sortBy": [
-          { "desc": true, "displayName": "Seit" }
-        ]
-      },
+      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 28 },
+      "id": 32,
+      "options": { "showHeader": true, "cellHeight": "sm", "footer": { "show": false }, "sortBy": [{ "desc": true, "displayName": "Seit" }] },
       "targets": [
         {
           "format": "table",
-          "rawSql": "SELECT \n  h.display_name as \"Host\",\n  s.display_name as \"Service\",\n  ss.soft_state as \"Status\",\n  TO_CHAR(TO_TIMESTAMP(ss.last_state_change / 1000), 'DD.MM HH24:MI') as \"Seit\",\n  LEFT(ss.output, 80) as \"Output\"\nFROM service s\nJOIN service_state ss ON s.id = ss.service_id\nJOIN host h ON s.host_id = h.id\nWHERE ss.soft_state > 0 AND ss.state_type = 1\nORDER BY ss.last_state_change DESC\nLIMIT 50",
+          "rawSql": "SELECT h.display_name as \"Host\", s.display_name as \"Service\", ss.soft_state as \"Status\", TO_CHAR(TO_TIMESTAMP(ss.last_state_change / 1000), 'DD.MM HH24:MI') as \"Seit\", LEFT(ss.output, 60) as \"Output\" FROM service s JOIN service_state ss ON s.id = ss.service_id JOIN host h ON s.host_id = h.id WHERE ss.soft_state > 0 AND ss.state_type = 1 ORDER BY ss.last_state_change DESC LIMIT 30",
           "refId": "A"
         }
       ],
-      "title": "⚠️ Aktuelle Probleme (nach Zeit sortiert)",
-      "type": "table"
-    },
-    {
-      "datasource": { "type": "postgres", "uid": "icingadb" },
-      "description": "Gruppierte Ansicht nach Host-Kategorie",
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false }
-          },
-          "mappings": [],
-          "color": { "mode": "palette-classic" }
-        }
-      },
-      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 17 },
-      "id": 10,
-      "options": {
-        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
-        "pieType": "pie",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
-        "tooltip": { "mode": "single" }
-      },
-      "targets": [
-        {
-          "format": "table",
-          "rawSql": "SELECT \n  COALESCE(hg.display_name, 'Ungroupiert') as \"Gruppe\",\n  COUNT(*) as \"Anzahl\"\nFROM host h\nLEFT JOIN hostgroup_member hgm ON h.id = hgm.host_id\nLEFT JOIN hostgroup hg ON hgm.hostgroup_id = hg.id\nGROUP BY hg.display_name\nORDER BY COUNT(*) DESC",
-          "refId": "A"
-        }
-      ],
-      "title": "📊 Hosts nach Gruppe",
-      "type": "piechart"
-    },
-    {
-      "datasource": { "type": "postgres", "uid": "icingadb" },
-      "fieldConfig": {
-        "defaults": {
-          "mappings": [],
-          "thresholds": {
-            "mode": "percentage",
-            "steps": [
-              { "color": "red", "value": null },
-              { "color": "yellow", "value": 90 },
-              { "color": "green", "value": 99 }
-            ]
-          },
-          "unit": "percentunit",
-          "max": 1,
-          "min": 0
-        }
-      },
-      "gridPos": { "h": 8, "w": 6, "x": 6, "y": 17 },
-      "id": 11,
-      "options": {
-        "orientation": "auto",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
-        "showThresholdLabels": false,
-        "showThresholdMarkers": true
-      },
-      "targets": [
-        {
-          "format": "table",
-          "rawSql": "SELECT \n  CAST(COUNT(*) FILTER (WHERE hs.soft_state = 0) AS FLOAT) / NULLIF(COUNT(*), 0) as \"Verfügbarkeit\"\nFROM host h\nJOIN host_state hs ON h.id = hs.host_id\nWHERE hs.state_type = 1",
-          "refId": "A"
-        }
-      ],
-      "title": "🎯 Host-Verfügbarkeit",
-      "type": "gauge"
-    },
-    {
-      "datasource": { "type": "postgres", "uid": "icingadb" },
-      "fieldConfig": {
-        "defaults": {
-          "mappings": [],
-          "thresholds": {
-            "mode": "percentage",
-            "steps": [
-              { "color": "red", "value": null },
-              { "color": "yellow", "value": 90 },
-              { "color": "green", "value": 99 }
-            ]
-          },
-          "unit": "percentunit",
-          "max": 1,
-          "min": 0
-        }
-      },
-      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 17 },
-      "id": 12,
-      "options": {
-        "orientation": "auto",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
-        "showThresholdLabels": false,
-        "showThresholdMarkers": true
-      },
-      "targets": [
-        {
-          "format": "table",
-          "rawSql": "SELECT \n  CAST(COUNT(*) FILTER (WHERE ss.soft_state = 0) AS FLOAT) / NULLIF(COUNT(*), 0) as \"Verfügbarkeit\"\nFROM service s\nJOIN service_state ss ON s.id = ss.service_id\nWHERE ss.state_type = 1",
-          "refId": "A"
-        }
-      ],
-      "title": "🎯 Service-Verfügbarkeit",
-      "type": "gauge"
-    },
-    {
-      "datasource": { "type": "postgres", "uid": "icingadb" },
-      "description": "Letzte Zustandsänderungen",
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "align": "left",
-            "displayMode": "auto",
-            "inspect": false
-          },
-          "mappings": [
-            { "options": { "0": { "color": "green", "index": 0, "text": "OK" } }, "type": "value" },
-            { "options": { "1": { "color": "yellow", "index": 1, "text": "WARNING" } }, "type": "value" },
-            { "options": { "2": { "color": "red", "index": 2, "text": "CRITICAL" } }, "type": "value" },
-            { "options": { "3": { "color": "purple", "index": 3, "text": "UNKNOWN" } }, "type": "value" }
-          ]
-        }
-      },
-      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 17 },
-      "id": 13,
-      "options": {
-        "showHeader": true,
-        "cellHeight": "sm",
-        "footer": { "show": false },
-        "sortBy": []
-      },
-      "targets": [
-        {
-          "format": "table",
-          "rawSql": "SELECT \n  h.display_name as \"Host\",\n  s.display_name as \"Service\",\n  ss.soft_state as \"Status\",\n  TO_CHAR(TO_TIMESTAMP(ss.last_state_change / 1000), 'HH24:MI:SS') as \"Zeit\"\nFROM service s\nJOIN service_state ss ON s.id = ss.service_id\nJOIN host h ON s.host_id = h.id\nWHERE ss.state_type = 1\nORDER BY ss.last_state_change DESC\nLIMIT 10",
-          "refId": "A"
-        }
-      ],
-      "title": "📋 Letzte Änderungen",
+      "title": "⚠️ Aktuelle Probleme",
       "type": "table"
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 25 },
-      "id": 14,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 38 },
+      "id": 40,
       "panels": [],
       "title": "🎙️ Radio Studio - Kritische Systeme",
       "type": "row"
     },
     {
       "datasource": { "type": "postgres", "uid": "icingadb" },
-      "description": "Streaming Encoder, Audio-Prozessoren",
+      "description": "Streaming Encoder, Audio-Prozessoren, NDI Devices",
       "fieldConfig": {
         "defaults": {
-          "custom": {
-            "align": "left",
-            "displayMode": "color-background-solid"
-          },
+          "custom": { "align": "left", "displayMode": "color-background-solid" },
           "mappings": [
             { "options": { "0": { "color": "green", "index": 0, "text": "✅ OK" } }, "type": "value" },
             { "options": { "1": { "color": "yellow", "index": 1, "text": "⚠️ WARN" } }, "type": "value" },
@@ -518,16 +751,13 @@
           ]
         }
       },
-      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 26 },
-      "id": 15,
-      "options": {
-        "showHeader": true,
-        "cellHeight": "sm"
-      },
+      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 39 },
+      "id": 41,
+      "options": { "showHeader": true, "cellHeight": "sm" },
       "targets": [
         {
           "format": "table",
-          "rawSql": "SELECT \n  h.display_name as \"Gerät\",\n  hs.soft_state as \"Status\",\n  LEFT(hs.output, 50) as \"Info\"\nFROM host h\nJOIN host_state hs ON h.id = hs.host_id\nJOIN hostgroup_member hgm ON h.id = hgm.host_id\nJOIN hostgroup hg ON hgm.hostgroup_id = hg.id\nWHERE hg.name IN ('av-devices', 'broadcast-devices')\n  AND hs.state_type = 1\nORDER BY hs.soft_state DESC, h.display_name",
+          "rawSql": "SELECT h.display_name as \"Gerät\", hs.soft_state as \"Status\", LEFT(hs.output, 40) as \"Info\" FROM host h JOIN host_state hs ON h.id = hs.host_id LEFT JOIN hostgroup_member hgm ON h.id = hgm.host_id LEFT JOIN hostgroup hg ON hgm.hostgroup_id = hg.id WHERE (hg.name IN ('av-devices', 'broadcast-devices', 'audio') OR h.name LIKE '%encoder%' OR h.name LIKE '%stream%') AND hs.state_type = 1 ORDER BY hs.soft_state DESC, h.display_name",
           "refId": "A"
         }
       ],
@@ -539,10 +769,7 @@
       "description": "Epiphan Pearl Encoder/Recorder",
       "fieldConfig": {
         "defaults": {
-          "custom": {
-            "align": "left",
-            "displayMode": "color-background-solid"
-          },
+          "custom": { "align": "left", "displayMode": "color-background-solid" },
           "mappings": [
             { "options": { "0": { "color": "green", "index": 0, "text": "✅ OK" } }, "type": "value" },
             { "options": { "1": { "color": "yellow", "index": 1, "text": "⚠️ WARN" } }, "type": "value" },
@@ -550,16 +777,13 @@
           ]
         }
       },
-      "gridPos": { "h": 6, "w": 8, "x": 8, "y": 26 },
-      "id": 16,
-      "options": {
-        "showHeader": true,
-        "cellHeight": "sm"
-      },
+      "gridPos": { "h": 6, "w": 8, "x": 8, "y": 39 },
+      "id": 42,
+      "options": { "showHeader": true, "cellHeight": "sm" },
       "targets": [
         {
           "format": "table",
-          "rawSql": "SELECT \n  h.display_name as \"Pearl\",\n  hs.soft_state as \"Status\",\n  LEFT(hs.output, 50) as \"Info\"\nFROM host h\nJOIN host_state hs ON h.id = hs.host_id\nWHERE h.name LIKE '%epiphan%' OR h.name LIKE '%pearl%'\n  AND hs.state_type = 1\nORDER BY hs.soft_state DESC, h.display_name",
+          "rawSql": "SELECT h.display_name as \"Pearl\", hs.soft_state as \"Status\", LEFT(hs.output, 40) as \"Info\" FROM host h JOIN host_state hs ON h.id = hs.host_id WHERE (LOWER(h.name) LIKE '%epiphan%' OR LOWER(h.name) LIKE '%pearl%') AND hs.state_type = 1 ORDER BY hs.soft_state DESC, h.display_name",
           "refId": "A"
         }
       ],
@@ -571,10 +795,7 @@
       "description": "Webanwendungen und APIs",
       "fieldConfig": {
         "defaults": {
-          "custom": {
-            "align": "left",
-            "displayMode": "color-background-solid"
-          },
+          "custom": { "align": "left", "displayMode": "color-background-solid" },
           "mappings": [
             { "options": { "0": { "color": "green", "index": 0, "text": "✅ OK" } }, "type": "value" },
             { "options": { "1": { "color": "yellow", "index": 1, "text": "⚠️ WARN" } }, "type": "value" },
@@ -582,30 +803,112 @@
           ]
         }
       },
-      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 26 },
-      "id": 17,
-      "options": {
-        "showHeader": true,
-        "cellHeight": "sm"
-      },
+      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 39 },
+      "id": 43,
+      "options": { "showHeader": true, "cellHeight": "sm" },
       "targets": [
         {
           "format": "table",
-          "rawSql": "SELECT \n  h.display_name as \"App\",\n  hs.soft_state as \"Status\",\n  LEFT(hs.output, 50) as \"Info\"\nFROM host h\nJOIN host_state hs ON h.id = hs.host_id\nJOIN hostgroup_member hgm ON h.id = hgm.host_id\nJOIN hostgroup hg ON hgm.hostgroup_id = hg.id\nWHERE hg.name = 'webapps'\n  AND hs.state_type = 1\nORDER BY hs.soft_state DESC, h.display_name",
+          "rawSql": "SELECT h.display_name as \"App\", hs.soft_state as \"Status\", LEFT(hs.output, 40) as \"Info\" FROM host h JOIN host_state hs ON h.id = hs.host_id LEFT JOIN hostgroup_member hgm ON h.id = hgm.host_id LEFT JOIN hostgroup hg ON hgm.hostgroup_id = hg.id WHERE (hg.name = 'webapps' OR h.name LIKE '%web%' OR h.name LIKE '%api%') AND hs.state_type = 1 ORDER BY hs.soft_state DESC, h.display_name",
           "refId": "A"
         }
       ],
       "title": "🌐 Web Applications",
       "type": "table"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 45 },
+      "id": 50,
+      "panels": [],
+      "title": "📊 Icinga2 Exporter Metriken",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 1 }, { "color": "red", "value": 5 }] },
+          "unit": "s"
+        }
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 46 },
+      "id": 51,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      },
+      "targets": [
+        {
+          "expr": "icinga2_scrape_duration_seconds",
+          "legendFormat": "Scrape Duration",
+          "refId": "A"
+        }
+      ],
+      "title": "⏱️ Icinga Scrape Time",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "unit": "short"
+        }
+      },
+      "gridPos": { "h": 4, "w": 18, "x": 6, "y": 46 },
+      "id": 52,
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "right", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "expr": "icinga2_scrape_duration_seconds",
+          "legendFormat": "Scrape Duration",
+          "refId": "A"
+        }
+      ],
+      "title": "📈 Icinga2 API Scrape History",
+      "type": "timeseries"
     }
   ],
-  "refresh": "1m",
+  "refresh": "30s",
   "schemaVersion": 38,
   "style": "dark",
-  "tags": ["icinga", "noc", "radio", "monitoring"],
+  "tags": ["icinga", "noc", "radio", "monitoring", "prometheus"],
   "templating": { "list": [] },
   "time": { "from": "now-1h", "to": "now" },
-  "timepicker": {},
+  "timepicker": {
+    "refresh_intervals": ["10s", "30s", "1m", "5m", "15m"],
+    "time_options": ["5m", "15m", "1h", "6h", "12h", "24h", "2d", "7d"]
+  },
   "timezone": "browser",
   "title": "NOC - Infrastructure Monitor",
   "uid": "noc-infrastructure",
