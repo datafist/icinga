@@ -12,7 +12,7 @@ services:
       - ICINGA_CN=icinga2
     volumes:
       - icinga2-data:/data
-      # IcingaDB Feature wird nach dem Start aktiviert
+      - ./config/icinga2/conf.d/api-users.conf:/data/etc/icinga2/conf.d/api-users.conf:ro
     networks:
       - icinga-network
     ports:
