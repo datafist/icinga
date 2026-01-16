@@ -98,11 +98,10 @@ Führe das Script **im Projektordner** aus (nicht im Container):
 ./scripts/init.sh
 ```
 
-Das Init-Skript führt 4 Teile aus:
-1. **00-copy-icinga-configs.sh** - Kopiert Custom-Configs (templates, services, thresholds)
-2. **01-director-kickstart.sh** - API-User, IcingaDB, Director-Migration
+Das Init-Skript führt 3 Teile aus:
+1. **01-director-kickstart.sh** - API-User, IcingaDB, Director-Migration
 2. **02-director-objects.sh** - Templates, Data Fields, Service Sets
-3. **03-director-deploy.sh** - Deployment der Konfiguration
+3. **03-director-deploy.sh** - Deployment der Konfiguration + Icinga2-Restart
 
 > ⚠️ **Wichtig:** Ohne dieses Script funktioniert das Monitoring nicht!
 
@@ -240,14 +239,13 @@ docker compose logs -f
 
 ### Initialisierungs-Script
 
-Das Script `./scripts/init.sh` muss **einmalig nach dem ersten Start** ausgeführt werden. Es besteht aus 4 Teilen:
+Das Script `./scripts/init.sh` muss **einmalig nach dem ersten Start** ausgeführt werden. Es besteht aus 3 Teilen:
 
 | Teil | Script | Funktion |
 |------|--------|----------|
-| 0 | `00-copy-icinga-configs.sh` | Kopiert Custom-Configs (templates, services, thresholds) in Container |
 | 1 | `01-director-kickstart.sh` | API-User, IcingaDB, Director-Migration & Kickstart |
 | 2 | `02-director-objects.sh` | Templates, Data Fields, Host/Service Groups, Service Sets |
-| 3 | `03-director-deploy.sh` | Director-Deployment mit Retry-Logik |
+| 3 | `03-director-deploy.sh` | Director-Deployment + Icinga2-Restart + Status-Sync |
 
 **Optionen:**
 ```bash
@@ -305,21 +303,16 @@ icinga/
 ├── .gitignore
 ├── README.md
 ├── scripts/
-│   ├── init.sh                    # Runner-Skript (ruft 00/01/02/03 auf)
-│   ├── 00-copy-icinga-configs.sh  # Kopiert Custom-Configs in Container
+│   ├── init.sh                    # Runner-Skript (ruft 01/02/03 auf)
 │   ├── 01-director-kickstart.sh   # API-User, IcingaDB, Director-Setup
 │   ├── 02-director-objects.sh     # Templates, Data Fields, Service Sets
-│   └── 03-director-deploy.sh      # Director-Deployment
+│   └── 03-director-deploy.sh      # Director-Deployment + Icinga2-Restart
 ├── init-db/
 │   └── 01-init-databases.sql   # PostgreSQL Datenbank-Initialisierung
 ├── config/
 │   ├── icinga2/
-│   │   ├── commands.conf       # Check-Kommandos (SNMP, Epiphan, Audio, etc.)
-│   │   ├── templates.conf      # Host- und Service-Templates
-│   │   ├── services.conf       # Service Apply Rules
-│   │   ├── hosts.conf          # Host-Definitionen (Beispiele)
-│   │   ├── notifications.conf  # Benachrichtigungskonfiguration
-│   │   ├── conf.d/             # Überschreibt Standard-Konfiguration
+│   │   ├── conf.d/
+│   │   │   └── api-users.conf  # API-User Konfiguration
 │   │   └── features/           # IcingaDB Feature
 │   ├── icingaweb2/
 │   │   └── modules/director/   # Director-Konfiguration
@@ -344,50 +337,16 @@ icinga/
 
 ## 🔧 Konfiguration
 
-### Zentrale Threshold-Variablen
+### Director-basierte Konfiguration
 
-Thresholds (Warning/Critical) werden **zentral** in `config/icinga2/conf.d/templates.conf` definiert und können **pro Host überschrieben** werden:
+Alle Host- und Service-Definitionen werden über den **Icinga Director** verwaltet. Der Director bietet:
 
-```icinga2
-const ThresholdDefaults = {
-  disk_warning = 80        /* Disk Usage % */
-  disk_critical = 90
-  load_warning = "5,4,3"   /* 1min, 5min, 15min */
-  load_critical = "10,8,6"
-  memory_warning = 80      /* Memory Usage % */
-  memory_critical = 90
-  procs_warning = 250      /* Prozess-Anzahl */
-  procs_critical = 400
-}
-```
+- **Host-Templates:** `director-host`, `linux-host`, `windows-snmp-host`, `network-device`, `broadcast-device`, etc.
+- **Service-Templates:** `director-service`, `critical-service`, `lowfreq-service`, etc.
+- **Data Fields:** Anpassbare Variablen pro Host (Thresholds, Ports, etc.)
+- **Deployment:** Automatisches Rollout der Konfiguration
 
-**Überschreiben auf Host-Ebene:**
-
-```icinga2
-object Host "db-server" {
-  import "linux-host"
-  address = "192.168.1.100"
-  
-  /* Strengere Thresholds für diesen Host */
-  vars.disk_warning = 70
-  vars.disk_critical = 85
-  vars.load_warning = "8,6,4"
-}
-```
-
-Im **Director** werden die gleichen Variablen als Data Fields angeboten.
-
-### Icinga2 Konfigurationsdateien
-
-| Datei | Beschreibung |
-|-------|--------------|
-| `commands.conf` | Benutzerdefinierte Check-Kommandos (SNMP, Epiphan, Dante, Shure) |
-| `templates.conf` | Host- und Service-Templates für verschiedene Gerätetypen |
-| `services.conf` | Service Apply Rules - welche Checks auf welche Hosts angewendet werden |
-| `hosts.conf` | Host-Definitionen mit Beispielen für alle Gerätetypen |
-| `notifications.conf` | Benachrichtigungen und User-Gruppen |
-
-**Hosts und Services:** [docs/HOST_HINZUFUEGEN.md](docs/HOST_HINZUFUEGEN.md)
+**Hosts hinzufügen:** Über Director UI oder CLI - siehe [docs/HOST_HINZUFUEGEN.md](docs/HOST_HINZUFUEGEN.md)
 
 **Grafana Dashboards:** JSON-Dateien unter `config/grafana/dashboards/` werden automatisch importiert. Siehe [docs/GRAFANA_DASHBOARD_HOWTO.md](docs/GRAFANA_DASHBOARD_HOWTO.md)
 

@@ -36,6 +36,10 @@ POSTGRES_CONTAINER=$(get_postgres_container)
 deploy_director_config() {
     log_info "Deploye Director-Konfiguration..."
     
+    # Erst alte pending Deployments bereinigen
+    docker exec "$POSTGRES_CONTAINER" psql -U icinga -d director -c \
+        "UPDATE director_deployment_log SET stage_collected = 'y', startup_succeeded = 'n' WHERE startup_succeeded IS NULL;" &>/dev/null || true
+    
     local output
     local retry=0
     local max_retries=3
@@ -47,6 +51,28 @@ deploy_director_config() {
         
         if echo "$output" | grep -qi "has been deployed\|Nothing to deploy\|matches last deployed\|Config matches"; then
             log_success "Director-Konfiguration deployed"
+            
+            # Warte kurz und prüfe ob Stage aktiviert wurde
+            sleep 5
+            
+            # Prüfe ob Director-Package eine aktive Stage hat
+            local active_stage
+            active_stage=$(curl -k -s -u "${API_USER}:${API_PASSWORD}" \
+                "https://localhost:5665/v1/config/packages" -H "Accept: application/json" 2>/dev/null | \
+                grep -o '"name":"director"[^}]*"active-stage":"[^"]*"' | grep -o '"active-stage":"[^"]*"' | cut -d'"' -f4)
+            
+            if [ -z "$active_stage" ] || [ "$active_stage" == "" ]; then
+                log_warn "Director-Stage noch nicht aktiv, starte Icinga2 neu..."
+                docker restart icinga2
+                sleep 10
+                
+                # Aktualisiere Deployment-Status
+                docker exec "$POSTGRES_CONTAINER" psql -U icinga -d director -c \
+                    "UPDATE director_deployment_log SET stage_collected = 'y', startup_succeeded = 'y' WHERE startup_succeeded IS NULL;" &>/dev/null || true
+                
+                log_success "Icinga2 neugestartet und Deployment-Status aktualisiert"
+            fi
+            
             return 0
         elif echo "$output" | grep -qi "Unable to authenticate"; then
             log_warn "API-Authentifizierung fehlgeschlagen, korrigiere Passwort..."

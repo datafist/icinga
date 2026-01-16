@@ -8,7 +8,7 @@ Dieses Dokument führt dich Schritt für Schritt durch das komplette Setup des I
 2. [Installation](#2-installation)
 3. [Erster Test](#3-erster-test)
 4. [Host hinzufügen (Director)](#4-host-hinzufügen-director)
-5. [Host hinzufügen (Konfiguration)](#5-host-hinzufügen-konfiguration)
+5. [Host hinzufügen (CLI)](#5-host-hinzufügen-cli)
 6. [Grafana Dashboard](#6-grafana-dashboard)
 7. [Thresholds anpassen](#7-thresholds-anpassen)
 
@@ -88,11 +88,10 @@ prometheus         running
 ./scripts/init.sh
 ```
 
-Das Script führt 4 Phasen aus:
-1. ✅ Kopiert Custom-Configs (Templates, Services, Thresholds)
-2. ✅ Director Kickstart (API-User, IcingaDB, Migration)
-3. ✅ Director Objects (Templates, Data Fields, Groups)
-4. ✅ Director Deploy
+Das Script führt 3 Phasen aus:
+1. ✅ Director Kickstart (API-User, IcingaDB, Migration)
+2. ✅ Director Objects (Templates, Data Fields, Groups)
+3. ✅ Director Deploy + Icinga2-Restart
 
 > **Hinweis:** Warnungen bei "Data Fields" und "Service Sets" sind bekannte Limitierungen der CLI und können ignoriert werden.
 
@@ -164,52 +163,37 @@ Unter **Custom properties** kannst du Threshold-Variablen überschreiben:
 
 ---
 
-## 5. Host hinzufügen (Konfiguration)
+## 5. Host hinzufügen (CLI)
 
-Alternative zur Director-Methode: Direkt in der Konfigurationsdatei.
+Alternative zur Director-UI: Über die Kommandozeile.
 
-### Schritt 5.1: Hosts-Datei bearbeiten
-
-```bash
-nano config/icinga2/conf.d/hosts.conf
-```
-
-### Schritt 5.2: Host hinzufügen
-
-```icinga2
-/* Neuer Linux-Server */
-object Host "my-server" {
-  import "linux-host"
-  address = "192.168.1.100"
-  
-  /* Optional: Thresholds überschreiben */
-  vars.disk_warning = 70
-  vars.disk_critical = 85
-  
-  /* Optional: Zusätzliche Checks aktivieren */
-  vars.http_vhosts["Main Website"] = {
-    http_uri = "/"
-  }
-}
-```
-
-### Schritt 5.3: Konfiguration kopieren & neu laden
+### Schritt 5.1: Host per CLI anlegen
 
 ```bash
-# Configs in Container kopieren
-./scripts/00-copy-icinga-configs.sh
-
-# Alternativ: Container neustarten
-docker restart icinga2
+docker exec icingaweb2 icingacli director host create "my-server" \
+  --json '{"object_type":"object","imports":["linux-host"],"address":"192.168.1.100"}'
 ```
 
-### Schritt 5.4: Konfiguration prüfen
+### Schritt 5.2: Custom Variables hinzufügen
 
 ```bash
-docker exec icinga2 icinga2 daemon -C
+# Beispiel: Strengere Disk-Thresholds
+docker exec icingaweb2 icingacli director host set "my-server" \
+  --json '{"vars.disk_warning":"70","vars.disk_critical":"85"}'
 ```
 
-Erwartete Ausgabe: `Finished validating the configuration file(s).`
+### Schritt 5.3: Deploy
+
+```bash
+docker exec icingaweb2 icingacli director config deploy
+```
+
+### Schritt 5.4: Prüfen
+
+```bash
+curl -k -s -u root:icinga "https://localhost:5665/v1/objects/hosts/my-server" \
+  -H "Accept: application/json" | python3 -m json.tool | head -20
+```
 
 ---
 
@@ -241,45 +225,35 @@ Erwartete Ausgabe: `Finished validating the configuration file(s).`
 
 ## 7. Thresholds anpassen
 
-### Globale Defaults ändern
+Alle Thresholds werden über den **Director** verwaltet. Die Host-Templates haben Standard-Werte, die pro Host überschrieben werden können.
 
-Bearbeite `config/icinga2/conf.d/templates.conf`:
+### Verfügbare Threshold-Variablen
 
-```icinga2
-const ThresholdDefaults = {
-  disk_warning = 80      /* Standard: 80% */
-  disk_critical = 90     /* Standard: 90% */
-  load_warning = "5,4,3"
-  load_critical = "10,8,6"
-  /* ... weitere Werte */
-}
-```
+| Variable | Beschreibung | Standard |
+|----------|--------------|----------|
+| `disk_warning` | Disk Usage % Warning | 80 |
+| `disk_critical` | Disk Usage % Critical | 90 |
+| `load_warning` | Load Average (1,5,15 Min) | 5,4,3 |
+| `load_critical` | Load Average Critical | 10,8,6 |
+| `procs_warning` | Prozess-Anzahl Warning | 250 |
+| `procs_critical` | Prozess-Anzahl Critical | 400 |
 
-Nach Änderung:
-
-```bash
-./scripts/00-copy-icinga-configs.sh
-```
-
-### Pro-Host Thresholds (Director)
+### Pro-Host Thresholds (Director UI)
 
 1. Host im Director öffnen
 2. **Custom properties** → Variable hinzufügen
 3. z.B. `disk_warning` = `70`
-4. Deploy
+4. **Store** → **Deploy**
 
-### Pro-Host Thresholds (Konfiguration)
+### Pro-Host Thresholds (CLI)
 
-```icinga2
-object Host "critical-server" {
-  import "linux-host"
-  address = "192.168.1.50"
-  
-  vars.disk_warning = 60
-  vars.disk_critical = 75
-  vars.load_warning = "3,2,1"
-  vars.load_critical = "5,4,3"
-}
+```bash
+# Thresholds für einen Host setzen
+docker exec icingaweb2 icingacli director host set "my-server" \
+  --json '{"vars.disk_warning":"70","vars.disk_critical":"85"}'
+
+# Deploy
+docker exec icingaweb2 icingacli director config deploy
 ```
 
 ---

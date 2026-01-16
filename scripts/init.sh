@@ -120,13 +120,6 @@ check_containers
 wait_for "PostgreSQL" "docker exec postgres pg_isready -U icinga 2>/dev/null || docker exec icinga-postgres pg_isready -U icinga"
 wait_for "Redis" "docker exec icingadb-redis redis-cli ping"
 wait_for "Icinga 2" "docker exec icinga2 icinga2 daemon -C"
-
-# Teil 0: Icinga2 Custom Configs kopieren (MUSS vor API-Check passieren!)
-run_part "${SCRIPT_DIR}/00-copy-icinga-configs.sh" "Icinga2 Custom Configs"
-
-# Warte bis Icinga2 nach Restart bereit ist
-sleep 10
-wait_for "Icinga 2" "docker exec icinga2 icinga2 daemon -C"
 wait_for "Icinga 2 API" "curl -k -s -o /dev/null -w '%{http_code}' -u ${ICINGA_API_USER}:${ICINGA_API_PASSWORD} https://localhost:5665/v1/status | grep -q 200"
 wait_for "IcingaWeb2" "curl -s -o /dev/null -w '%{http_code}' http://localhost:8080 | grep -qE '200|302'"
 
