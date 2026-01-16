@@ -95,26 +95,40 @@ create_datafields() {
     create_datafield "nrpe_command" "NRPE Command"
     create_datafield "nrpe_arguments" "NRPE Arguments"
     
-    # Disk
-    create_datafield "disk_warning" "Disk Warning %"
-    create_datafield "disk_critical" "Disk Critical %"
+    # Disk (konsistent mit ThresholdDefaults in templates.conf)
+    create_datafield "disk_warning" "Disk Warning % (Default: 80)"
+    create_datafield "disk_critical" "Disk Critical % (Default: 90)"
     create_datafield "disk_partition" "Disk Partition"
     
-    # Load
-    create_datafield "load_warning" "Load Warning"
-    create_datafield "load_critical" "Load Critical"
+    # Load (konsistent mit ThresholdDefaults)
+    create_datafield "load_warning" "Load Warning (Default: 5,4,3)"
+    create_datafield "load_critical" "Load Critical (Default: 10,8,6)"
     
-    # Memory
-    create_datafield "memory_warning" "Memory Warning %"
-    create_datafield "memory_critical" "Memory Critical %"
+    # Memory (konsistent mit ThresholdDefaults)
+    create_datafield "memory_warning" "Memory Warning % (Default: 80)"
+    create_datafield "memory_critical" "Memory Critical % (Default: 90)"
     
-    # Swap
-    create_datafield "swap_warning" "Swap Warning %"
-    create_datafield "swap_critical" "Swap Critical %"
+    # Swap (konsistent mit ThresholdDefaults)
+    create_datafield "swap_warning" "Swap Warning % (Default: 50)"
+    create_datafield "swap_critical" "Swap Critical % (Default: 80)"
     
-    # Procs
-    create_datafield "procs_warning" "Procs Warning"
-    create_datafield "procs_critical" "Procs Critical"
+    # Procs (konsistent mit ThresholdDefaults)
+    create_datafield "procs_warning" "Procs Warning (Default: 250)"
+    create_datafield "procs_critical" "Procs Critical (Default: 400)"
+    
+    # Users
+    create_datafield "users_warning" "Users Warning (Default: 5)"
+    create_datafield "users_critical" "Users Critical (Default: 10)"
+    
+    # Ping/Network
+    create_datafield "ping_wrta" "Ping Warning RTT ms (Default: 100)"
+    create_datafield "ping_crta" "Ping Critical RTT ms (Default: 500)"
+    create_datafield "ping_wpl" "Ping Warning Packet Loss % (Default: 5)"
+    create_datafield "ping_cpl" "Ping Critical Packet Loss % (Default: 10)"
+    
+    # HTTP
+    create_datafield "http_warn_time" "HTTP Warning Time s (Default: 5)"
+    create_datafield "http_critical_time" "HTTP Critical Time s (Default: 15)"
 }
 
 # ============================================================
@@ -127,25 +141,26 @@ create_host_templates() {
     director_create "host" "director-host" \
         '{"object_type":"template","check_command":"hostalive","check_interval":"60","retry_interval":"30","max_check_attempts":3}'
     
-    # Linux Host mit NRPE (NEU)
+    # Linux Host Template mit Default-Thresholds (konsistent mit templates.conf)
     director_create "host" "tpl-host-linux" \
-        '{"object_type":"template","imports":["director-host"],"check_command":"hostalive","vars":{"os":"Linux"}}'
+        '{"object_type":"template","imports":["director-host"],"check_command":"hostalive","vars":{"os":"Linux","disk_warning":"80","disk_critical":"90","load_warning":"5,4,3","load_critical":"10,8,6","memory_warning":"80","memory_critical":"90","swap_warning":"50","swap_critical":"80","procs_warning":"250","procs_critical":"400","users_warning":"5","users_critical":"10"}}'
     
-    # Bestehende Templates beibehalten
+    # Bestehende Templates beibehalten (importieren jetzt tpl-host-linux)
     director_create "host" "linux-host" \
-        '{"object_type":"template","imports":["director-host"],"check_command":"hostalive","vars":{"os":"Linux","enable_ssh":true,"enable_disk":true,"enable_load":true,"enable_procs":true,"enable_memory":true}}'
+        '{"object_type":"template","imports":["tpl-host-linux"],"vars":{"enable_ssh":true,"enable_disk":true,"enable_load":true,"enable_procs":true,"enable_memory":true}}'
     
+    # Windows mit Default-Thresholds
     director_create "host" "windows-snmp-host" \
-        '{"object_type":"template","imports":["director-host"],"check_command":"hostalive","vars":{"os":"Windows","snmp_community":"public","snmp_version":"2c"}}'
+        '{"object_type":"template","imports":["director-host"],"check_command":"hostalive","vars":{"os":"Windows","snmp_community":"public","snmp_version":"2c","disk_warning":"80","disk_critical":"90","memory_warning":"80","memory_critical":"90"}}'
     
     director_create "host" "network-device" \
-        '{"object_type":"template","imports":["director-host"],"check_command":"hostalive","vars":{"os":"Network","snmp_community":"public","snmp_version":"2c"}}'
+        '{"object_type":"template","imports":["director-host"],"check_command":"hostalive","vars":{"os":"Network","snmp_community":"public","snmp_version":"2c","ping_wrta":"100","ping_crta":"500"}}'
     
     director_create "host" "broadcast-device" \
-        '{"object_type":"template","imports":["director-host"],"check_command":"hostalive","vars":{"os":"Broadcast","device_type":"broadcast"}}'
+        '{"object_type":"template","imports":["director-host"],"check_command":"hostalive","vars":{"os":"Broadcast","device_type":"broadcast","ping_wrta":"50","ping_crta":"200"}}'
     
     director_create "host" "epiphan-device" \
-        '{"object_type":"template","imports":["director-host"],"check_command":"hostalive","vars":{"os":"Epiphan","device_type":"epiphan"}}'
+        '{"object_type":"template","imports":["director-host"],"check_command":"hostalive","vars":{"os":"Epiphan","device_type":"epiphan","http_warn_time":"3","http_critical_time":"10"}}'
     
     director_create "host" "audio-device" \
         '{"object_type":"template","imports":["director-host"],"check_command":"hostalive","vars":{"os":"Audio","device_type":"audio"}}'
