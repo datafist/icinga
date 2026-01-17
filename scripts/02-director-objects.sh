@@ -2,12 +2,17 @@
 #
 # Teil 2: Director Objects
 # 
-# Legt Director-Basisobjekte idempotent an:
-# - Commands (NRPE, tcp, http)
-# - Data Fields
-# - Host/Service Templates
-# - Host/Service Groups
-# - Service Sets
+# Legt Director-Basisobjekte idempotent an.
+# Prinzipien:
+# - Minimal: Nur was wirklich gebraucht wird
+# - Konsistent: Einheitliche Namenskonventionen
+# - Erweiterbar: Einfach neue Geräte hinzufügen
+#
+# Namenskonvention:
+#   Host Templates:  tpl-<typ>         (z.B. tpl-linux, tpl-epiphan)
+#   Service Templates: svc-<check>     (z.B. svc-nrpe-disk, svc-https)
+#   Service Sets:    set-<zweck>       (z.B. set-nrpe, set-ping)
+#   Host Groups:     grp-<kategorie>   (z.B. grp-pearls, grp-studio1)
 #
 set -euo pipefail
 
@@ -39,17 +44,15 @@ director_create() {
     fi
 }
 
-# === Helper: Data Field erstellen via SQL ===
+# === Helper: Data Field via SQL (kein CLI verfügbar) ===
 create_datafield() {
     local varname=$1
     local caption=$2
-    local datatype=${3:-"Icinga\\\\Module\\\\Director\\\\DataType\\\\DataTypeString"}
     
-    # Data Fields müssen via SQL erstellt werden, da kein CLI-Befehl existiert
     local result
     result=$(docker exec icinga-postgres psql -U icinga -d director -t -c \
         "INSERT INTO director_datafield (varname, caption, datatype) 
-         VALUES ('${varname}', '${caption}', '${datatype}') 
+         VALUES ('${varname}', '${caption}', 'Icinga\\Module\\Director\\DataType\\DataTypeString') 
          ON CONFLICT (varname) DO NOTHING 
          RETURNING varname;" 2>&1) || true
     
@@ -60,17 +63,11 @@ create_datafield() {
     fi
 }
 
-# === Helper: Host/Service Group erstellen ===
+# === Helper: Host Group erstellen ===
 create_hostgroup() {
     local name=$1
     local display=$2
     director_create "hostgroup" "$name" "{\"object_name\":\"${name}\",\"display_name\":\"${display}\"}"
-}
-
-create_servicegroup() {
-    local name=$1
-    local display=$2
-    director_create "servicegroup" "$name" "{\"object_name\":\"${name}\",\"display_name\":\"${display}\"}"
 }
 
 # ============================================================
@@ -79,247 +76,270 @@ create_servicegroup() {
 create_commands() {
     log_info "Erstelle Commands..."
     
-    # NRPE Command (generisch)
-    director_create "command" "check_nrpe" \
-        '{"object_type":"object","command":"check_nrpe","methods_execute":"PluginCheck","arguments":{"--host":{"value":"$address$","order":1},"--command":{"value":"$nrpe_command$","order":2},"--args":{"value":"$nrpe_arguments$","skip_key":true,"repeat_key":false,"order":3}}}'
-    
-    # Die folgenden Commands existieren bereits als Built-ins, aber wir stellen sicher dass sie da sind
-    # check_tcp und check_http sind in ITL bereits vorhanden
+    # NRPE Command - custom, um Konflikt mit ITL 'nrpe' zu vermeiden
+    director_create "command" "check_nrpe_custom" \
+        '{"object_type":"object","command":"check_nrpe","methods_execute":"PluginCheck","arguments":{"-H":{"value":"$address$","order":1},"-c":{"value":"$nrpe_command$","order":2}}}'
 }
 
 # ============================================================
-# DATA FIELDS
+# DATA FIELDS (nur was wirklich gebraucht wird)
 # ============================================================
 create_datafields() {
     log_info "Erstelle Data Fields..."
     
-    # NRPE
-    create_datafield "nrpe_command" "NRPE Command"
-    create_datafield "nrpe_arguments" "NRPE Arguments"
+    # NRPE - wird in allen NRPE-Services verwendet
+    create_datafield "nrpe_command" "NRPE Command Name"
     
-    # Disk (konsistent mit ThresholdDefaults in templates.conf)
-    create_datafield "disk_warning" "Disk Warning % (Default: 80)"
-    create_datafield "disk_critical" "Disk Critical % (Default: 90)"
-    create_datafield "disk_partition" "Disk Partition"
+    # Epiphan Pearl - für REST API Zugriff
+    create_datafield "epiphan_user" "Epiphan API User"
+    create_datafield "epiphan_pass" "Epiphan API Password"
     
-    # Load (konsistent mit ThresholdDefaults)
-    create_datafield "load_warning" "Load Warning (Default: 5,4,3)"
-    create_datafield "load_critical" "Load Critical (Default: 10,8,6)"
+    # Streaming - für Icecast/Shoutcast Checks
+    create_datafield "stream_port" "Stream Port (z.B. 8000)"
+    create_datafield "stream_mount" "Stream Mount (z.B. /live)"
     
-    # Memory (konsistent mit ThresholdDefaults)
-    create_datafield "memory_warning" "Memory Warning % (Default: 80)"
-    create_datafield "memory_critical" "Memory Critical % (Default: 90)"
-    
-    # Swap (konsistent mit ThresholdDefaults)
-    create_datafield "swap_warning" "Swap Warning % (Default: 50)"
-    create_datafield "swap_critical" "Swap Critical % (Default: 80)"
-    
-    # Procs (konsistent mit ThresholdDefaults)
-    create_datafield "procs_warning" "Procs Warning (Default: 250)"
-    create_datafield "procs_critical" "Procs Critical (Default: 400)"
-    
-    # Users
-    create_datafield "users_warning" "Users Warning (Default: 5)"
-    create_datafield "users_critical" "Users Critical (Default: 10)"
-    
-    # Ping/Network
-    create_datafield "ping_wrta" "Ping Warning RTT ms (Default: 100)"
-    create_datafield "ping_crta" "Ping Critical RTT ms (Default: 500)"
-    create_datafield "ping_wpl" "Ping Warning Packet Loss % (Default: 5)"
-    create_datafield "ping_cpl" "Ping Critical Packet Loss % (Default: 10)"
-    
-    # HTTP
-    create_datafield "http_warn_time" "HTTP Warning Time s (Default: 5)"
-    create_datafield "http_critical_time" "HTTP Critical Time s (Default: 15)"
+    # Standort/Funktion - für automatische Host Group Zuweisung
+    create_datafield "studio" "Studio Nummer (1 oder 2)"
+    create_datafield "role" "Rolle (z.B. playout, encoder)"
 }
 
 # ============================================================
-# HOST TEMPLATES
+# HOST TEMPLATES (8 Templates - konsolidiert)
+# Hierarchie: tpl-base → tpl-<os> oder tpl-<gerät>
 # ============================================================
 create_host_templates() {
     log_info "Erstelle Host Templates..."
     
-    # Basis-Template (bereits vorhanden, aber sicherstellen)
-    director_create "host" "director-host" \
-        '{"object_type":"template","check_command":"hostalive","check_interval":"60","retry_interval":"30","max_check_attempts":3}'
+    # === BASIS ===
+    director_create "host" "tpl-base" \
+        '{"object_type":"template","check_command":"hostalive","check_interval":"60","retry_interval":"30","max_check_attempts":"3"}'
     
-    # Linux Host Template mit Default-Thresholds (konsistent mit templates.conf)
-    director_create "host" "tpl-host-linux" \
-        '{"object_type":"template","imports":["director-host"],"check_command":"hostalive","vars":{"os":"Linux","disk_warning":"80","disk_critical":"90","load_warning":"5,4,3","load_critical":"10,8,6","memory_warning":"80","memory_critical":"90","swap_warning":"50","swap_critical":"80","procs_warning":"250","procs_critical":"400","users_warning":"5","users_critical":"10"}}'
+    # === BETRIEBSSYSTEME ===
+    # Linux Server - NRPE Agent
+    director_create "host" "tpl-linux" \
+        '{"object_type":"template","imports":["tpl-base"],"vars":{"os":"Linux"}}'
     
-    # Bestehende Templates beibehalten (importieren jetzt tpl-host-linux)
-    director_create "host" "linux-host" \
-        '{"object_type":"template","imports":["tpl-host-linux"],"vars":{"enable_ssh":true,"enable_disk":true,"enable_load":true,"enable_procs":true,"enable_memory":true}}'
+    # Windows Server - Icinga Agent
+    # Für mAirList: vars.role = "playout" beim Host setzen
+    director_create "host" "tpl-windows" \
+        '{"object_type":"template","imports":["tpl-base"],"vars":{"os":"Windows"}}'
     
-    # Windows mit Default-Thresholds
-    director_create "host" "windows-snmp-host" \
-        '{"object_type":"template","imports":["director-host"],"check_command":"hostalive","vars":{"os":"Windows","snmp_community":"public","snmp_version":"2c","disk_warning":"80","disk_critical":"90","memory_warning":"80","memory_critical":"90"}}'
+    # macOS Client - NRPE Agent
+    director_create "host" "tpl-macos" \
+        '{"object_type":"template","imports":["tpl-base"],"vars":{"os":"macOS"}}'
     
-    director_create "host" "network-device" \
-        '{"object_type":"template","imports":["director-host"],"check_command":"hostalive","vars":{"os":"Network","snmp_community":"public","snmp_version":"2c","ping_wrta":"100","ping_crta":"500"}}'
+    # === NETZWERK ===
+    director_create "host" "tpl-switch" \
+        '{"object_type":"template","imports":["tpl-base"],"vars":{"device":"switch"}}'
     
-    director_create "host" "broadcast-device" \
-        '{"object_type":"template","imports":["director-host"],"check_command":"hostalive","vars":{"os":"Broadcast","device_type":"broadcast","ping_wrta":"50","ping_crta":"200"}}'
+    # === AV/BROADCAST GERÄTE ===
+    # Generisch für: Shure, Maxhub, MicroMPX, etc.
+    # Spezifischer device-Typ wird beim Host gesetzt
+    director_create "host" "tpl-av-device" \
+        '{"object_type":"template","imports":["tpl-base"],"vars":{"device":"av"}}'
     
-    director_create "host" "epiphan-device" \
-        '{"object_type":"template","imports":["director-host"],"check_command":"hostalive","vars":{"os":"Epiphan","device_type":"epiphan","http_warn_time":"3","http_critical_time":"10"}}'
+    # Epiphan Pearl - HTTP + API Credentials
+    director_create "host" "tpl-epiphan" \
+        '{"object_type":"template","imports":["tpl-base"],"vars":{"device":"epiphan","epiphan_user":"admin","epiphan_pass":"admin"}}'
     
-    director_create "host" "audio-device" \
-        '{"object_type":"template","imports":["director-host"],"check_command":"hostalive","vars":{"os":"Audio","device_type":"audio"}}'
+    # === STREAMING ===
+    director_create "host" "tpl-stream" \
+        '{"object_type":"template","imports":["tpl-linux"],"vars":{"device":"icecast","stream_port":"8000","stream_mount":"/live"}}'
     
-    director_create "host" "dante-device" \
-        '{"object_type":"template","imports":["audio-device"],"check_command":"hostalive","vars":{"device_type":"dante","dante_port":4440}}'
-    
-    director_create "host" "wireless-microphone" \
-        '{"object_type":"template","imports":["audio-device"],"check_command":"hostalive","vars":{"device_type":"wireless-mic","battery_warning":30,"battery_critical":10}}'
+    # === WEB ===
+    director_create "host" "tpl-web" \
+        '{"object_type":"template","imports":["tpl-base"],"vars":{"device":"web"}}'
 }
 
 # ============================================================
 # SERVICE TEMPLATES
+# Namenskonvention: svc-<protokoll>-<was> oder svc-<was>
 # ============================================================
 create_service_templates() {
     log_info "Erstelle Service Templates..."
     
-    # Basis
-    director_create "service" "director-service" \
-        '{"object_type":"template","check_interval":"60","retry_interval":"30","max_check_attempts":3}'
+    # === BASIS ===
+    director_create "service" "svc-base" \
+        '{"object_type":"template","check_interval":"60","retry_interval":"30","max_check_attempts":"3"}'
     
-    director_create "service" "critical-service" \
-        '{"object_type":"template","imports":["director-service"],"check_interval":"30","retry_interval":"10","max_check_attempts":5}'
+    director_create "service" "svc-critical" \
+        '{"object_type":"template","imports":["svc-base"],"check_interval":"30","retry_interval":"10","max_check_attempts":"5"}'
     
-    director_create "service" "lowfreq-service" \
-        '{"object_type":"template","imports":["director-service"],"check_interval":"300","retry_interval":"60","max_check_attempts":3}'
-    
-# NRPE Service Templates
-    director_create "service" "nrpe-disk" \
-        '{"object_type":"template","imports":["director-service"],"check_command":"check_nrpe","vars":{"nrpe_command":"check_disk","nrpe_arguments":"-w $disk_warning$ -c $disk_critical$ -p $disk_partition$"}}'
+    # === NRPE CHECKS ===
+    # Nutzt check_nrpe_custom (unser Command), Thresholds in nrpe.cfg auf Host
+    director_create "service" "svc-nrpe-disk" \
+        '{"object_type":"template","imports":["svc-base"],"check_command":"check_nrpe_custom","vars":{"nrpe_command":"check_disk"}}'
 
-    director_create "service" "nrpe-load" \
-        '{"object_type":"template","imports":["director-service"],"check_command":"check_nrpe","vars":{"nrpe_command":"check_load","nrpe_arguments":"-w $load_warning$ -c $load_critical$"}}'
+    director_create "service" "svc-nrpe-load" \
+        '{"object_type":"template","imports":["svc-base"],"check_command":"check_nrpe_custom","vars":{"nrpe_command":"check_load"}}'
 
-    director_create "service" "nrpe-memory" \
-        '{"object_type":"template","imports":["director-service"],"check_command":"check_nrpe","vars":{"nrpe_command":"check_mem","nrpe_arguments":"-w $memory_warning$ -c $memory_critical$"}}'
+    director_create "service" "svc-nrpe-memory" \
+        '{"object_type":"template","imports":["svc-base"],"check_command":"check_nrpe_custom","vars":{"nrpe_command":"check_mem"}}'
     
-director_create "service" "nrpe-swap" \
-        '{"object_type":"template","imports":["director-service"],"check_command":"check_nrpe","vars":{"nrpe_command":"check_swap","nrpe_arguments":"-w $swap_warning$ -c $swap_critical$"}}'
-
-    director_create "service" "nrpe-procs" \
-        '{"object_type":"template","imports":["director-service"],"check_command":"check_nrpe","vars":{"nrpe_command":"check_procs","nrpe_arguments":"-w $procs_warning$ -c $procs_critical$"}}'
+    director_create "service" "svc-nrpe-procs" \
+        '{"object_type":"template","imports":["svc-base"],"check_command":"check_nrpe_custom","vars":{"nrpe_command":"check_procs"}}'
     
-    # Bestehende Templates beibehalten
-    director_create "service" "linux-ssh" \
-        '{"object_type":"template","imports":["director-service"],"check_command":"ssh"}'
+    # === HTTP CHECKS ===
+    director_create "service" "svc-http" \
+        '{"object_type":"template","imports":["svc-base"],"check_command":"http"}'
     
-    director_create "service" "linux-disk" \
-        '{"object_type":"template","imports":["director-service"],"check_command":"disk","vars":{"disk_wfree":"20%","disk_cfree":"10%"}}'
+    director_create "service" "svc-https" \
+        '{"object_type":"template","imports":["svc-base"],"check_command":"http","vars":{"http_ssl":true}}'
     
-    director_create "service" "linux-load" \
-        '{"object_type":"template","imports":["director-service"],"check_command":"load","vars":{"load_wload1":"5","load_cload1":"10"}}'
+    director_create "service" "svc-ssl-cert" \
+        '{"object_type":"template","imports":["svc-base"],"check_command":"http","vars":{"http_ssl":true,"http_certificate":"30"}}'
     
-    director_create "service" "http-check" \
-        '{"object_type":"template","imports":["director-service"],"check_command":"http"}'
+    # === STREAMING ===
+    director_create "service" "svc-icecast" \
+        '{"object_type":"template","imports":["svc-critical"],"check_command":"http","vars":{"http_port":"$stream_port$","http_uri":"$stream_mount$"}}'
     
-    director_create "service" "https-check" \
-        '{"object_type":"template","imports":["director-service"],"check_command":"http","vars":{"http_ssl":true}}'
+    # === BASIC CHECKS ===
+    director_create "service" "svc-ping" \
+        '{"object_type":"template","imports":["svc-base"],"check_command":"ping4"}'
     
-    director_create "service" "tcp-check" \
-        '{"object_type":"template","imports":["director-service"],"check_command":"tcp"}'
-    
-    director_create "service" "ping-check" \
-        '{"object_type":"template","imports":["director-service"],"check_command":"ping4"}'
+    director_create "service" "svc-tcp" \
+        '{"object_type":"template","imports":["svc-base"],"check_command":"tcp"}'
 }
 
 # ============================================================
-# HOST GROUPS
+# HOST GROUPS mit Assign Filter
+# Filter basiert auf vars.device oder vars.studio
 # ============================================================
-# Hinweis: linux-servers und windows-servers werden NICHT erstellt,
-# da Icinga2 diese bereits in /etc/icinga2/conf.d/groups.conf definiert hat
-# mit nützlichen "assign where" Regeln.
 create_hostgroups() {
     log_info "Erstelle Host Groups..."
     
-    # Diese Gruppen sind Icinga2-Standard, nicht im Director erstellen:
-    # - linux-servers (assign where host.vars.os == "Linux")
-    # - windows-servers (assign where host.vars.os == "Windows")
+    # Nach Gerätetyp - automatische Zuweisung via vars.device
+    director_create "hostgroup" "grp-pearls" \
+        '{"object_name":"grp-pearls","display_name":"Epiphan Pearls","assign_filter":"host.vars.device=%22epiphan%22"}'
     
-    create_hostgroup "network-devices" "Network Devices"
-    create_hostgroup "webapps" "Web Applications"
-    create_hostgroup "av-devices" "Audio/Video Devices"
-}
-
-# ============================================================
-# SERVICE GROUPS
-# ============================================================
-create_servicegroups() {
-    log_info "Erstelle Service Groups..."
+    director_create "hostgroup" "grp-av-devices" \
+        '{"object_name":"grp-av-devices","display_name":"AV Geräte","assign_filter":"host.vars.device=%22av%22"}'
     
-    create_servicegroup "linux-system" "Linux System Checks"
-    create_servicegroup "network-availability" "Network Availability"
-    create_servicegroup "web-availability" "Web Availability"
+    director_create "hostgroup" "grp-switches" \
+        '{"object_name":"grp-switches","display_name":"Netzwerk Switches","assign_filter":"host.vars.device=%22switch%22"}'
+    
+    director_create "hostgroup" "grp-web" \
+        '{"object_name":"grp-web","display_name":"Web Plattformen","assign_filter":"host.vars.device=%22web%22"}'
+    
+    director_create "hostgroup" "grp-streaming" \
+        '{"object_name":"grp-streaming","display_name":"Streaming Infrastruktur","assign_filter":"host.vars.device=%22icecast%22"}'
+    
+    # Nach Standort - Zuweisung via vars.studio
+    director_create "hostgroup" "grp-studio1" \
+        '{"object_name":"grp-studio1","display_name":"Studio 1","assign_filter":"host.vars.studio=%221%22"}'
+    
+    director_create "hostgroup" "grp-studio2" \
+        '{"object_name":"grp-studio2","display_name":"Studio 2","assign_filter":"host.vars.studio=%222%22"}'
+    
+    # OS-basierte Gruppen
+    director_create "hostgroup" "grp-linux" \
+        '{"object_name":"grp-linux","display_name":"Linux Server","assign_filter":"host.vars.os=%22Linux%22"}'
+    
+    director_create "hostgroup" "grp-windows" \
+        '{"object_name":"grp-windows","display_name":"Windows Server","assign_filter":"host.vars.os=%22Windows%22"}'
+    
+    director_create "hostgroup" "grp-macos" \
+        '{"object_name":"grp-macos","display_name":"macOS Clients","assign_filter":"host.vars.os=%22macOS%22"}'
 }
 
 # ============================================================
 # SERVICE SETS
+# Bündeln Services die zusammen auf Hosts angewendet werden
 # ============================================================
 create_service_sets() {
     log_info "Erstelle Service Sets..."
     
     local output
     
-    # === Linux Base NRPE Set ===
-    output=$(docker exec icingaweb2 icingacli director serviceset create "linux-base-nrpe" --json \
-        '{"object_name":"linux-base-nrpe","object_type":"template","description":"Basic Linux checks via NRPE"}' 2>&1) || true
+    # === NRPE Base (Linux/macOS) ===
+    output=$(docker exec icingaweb2 icingacli director serviceset create "set-nrpe" --json \
+        '{"object_name":"set-nrpe","object_type":"template","description":"Standard NRPE Checks (Disk, Load, Memory, Procs)"}' 2>&1) || true
+    if echo "$output" | grep -qE "created|exists"; then log_success "Service Set 'set-nrpe' OK"; fi
     
-    if echo "$output" | grep -q "has been created"; then
-        log_success "Service Set 'linux-base-nrpe' erstellt"
-    elif echo "$output" | grep -qE "already exists|DuplicateKeyException"; then
-        log_success "Service Set 'linux-base-nrpe' existiert bereits"
-    else
-        log_warn "Service Set 'linux-base-nrpe': $output"
-    fi
-    
-    # Services zum Set hinzufügen
-    director_create "service" "Disk /" \
-        '{"object_name":"Disk /","object_type":"object","imports":["nrpe-disk"],"service_set":"linux-base-nrpe","vars":{"disk_partition":"/"}}'
-    
+    director_create "service" "Disk" \
+        '{"object_name":"Disk","object_type":"object","imports":["svc-nrpe-disk"],"service_set":"set-nrpe"}'
     director_create "service" "Load" \
-        '{"object_name":"Load","object_type":"object","imports":["nrpe-load"],"service_set":"linux-base-nrpe"}'
-    
+        '{"object_name":"Load","object_type":"object","imports":["svc-nrpe-load"],"service_set":"set-nrpe"}'
     director_create "service" "Memory" \
-        '{"object_name":"Memory","object_type":"object","imports":["nrpe-memory"],"service_set":"linux-base-nrpe"}'
-    
-    director_create "service" "Swap" \
-        '{"object_name":"Swap","object_type":"object","imports":["nrpe-swap"],"service_set":"linux-base-nrpe"}'
-    
+        '{"object_name":"Memory","object_type":"object","imports":["svc-nrpe-memory"],"service_set":"set-nrpe"}'
     director_create "service" "Procs" \
-        '{"object_name":"Procs","object_type":"object","imports":["nrpe-procs"],"service_set":"linux-base-nrpe"}'
+        '{"object_name":"Procs","object_type":"object","imports":["svc-nrpe-procs"],"service_set":"set-nrpe"}'
     
-    # === Linux Network Set ===
-    output=$(docker exec icingaweb2 icingacli director serviceset create "linux-network" --json \
-        '{"object_name":"linux-network","object_type":"template","description":"Linux network checks"}' 2>&1) || true
-    
-    if echo "$output" | grep -q "has been created"; then
-        log_success "Service Set 'linux-network' erstellt"
-    elif echo "$output" | grep -qE "already exists|DuplicateKeyException"; then
-        log_success "Service Set 'linux-network' existiert bereits"
-    else
-        log_warn "Service Set 'linux-network': $output"
-    fi
-    
-    director_create "service" "SSH" \
-        '{"object_name":"SSH","object_type":"object","imports":["tcp-check"],"service_set":"linux-network","vars":{"tcp_port":22}}'
+    # === Ping Only (einfache Geräte) ===
+    output=$(docker exec icingaweb2 icingacli director serviceset create "set-ping" --json \
+        '{"object_name":"set-ping","object_type":"template","description":"Nur Erreichbarkeit prüfen"}' 2>&1) || true
+    if echo "$output" | grep -qE "created|exists"; then log_success "Service Set 'set-ping' OK"; fi
     
     director_create "service" "Ping" \
-        '{"object_name":"Ping","object_type":"object","imports":["ping-check"],"service_set":"linux-network"}'
+        '{"object_name":"Ping","object_type":"object","imports":["svc-ping"],"service_set":"set-ping"}'
+    
+    # === Web Plattform (HTTPS + SSL) ===
+    output=$(docker exec icingaweb2 icingacli director serviceset create "set-web" --json \
+        '{"object_name":"set-web","object_type":"template","description":"HTTPS Erreichbarkeit + SSL Zertifikat"}' 2>&1) || true
+    if echo "$output" | grep -qE "created|exists"; then log_success "Service Set 'set-web' OK"; fi
+    
+    director_create "service" "HTTPS" \
+        '{"object_name":"HTTPS","object_type":"object","imports":["svc-https"],"service_set":"set-web"}'
+    director_create "service" "SSL Zertifikat" \
+        '{"object_name":"SSL Zertifikat","object_type":"object","imports":["svc-ssl-cert"],"service_set":"set-web"}'
+    
+    # === Epiphan Pearl ===
+    output=$(docker exec icingaweb2 icingacli director serviceset create "set-epiphan" --json \
+        '{"object_name":"set-epiphan","object_type":"template","description":"Epiphan Pearl Web UI Check"}' 2>&1) || true
+    if echo "$output" | grep -qE "created|exists"; then log_success "Service Set 'set-epiphan' OK"; fi
+    
+    director_create "service" "Web UI" \
+        '{"object_name":"Web UI","object_type":"object","imports":["svc-http"],"service_set":"set-epiphan"}'
+    
+    # === Stream Server ===
+    output=$(docker exec icingaweb2 icingacli director serviceset create "set-stream" --json \
+        '{"object_name":"set-stream","object_type":"template","description":"Icecast Stream Check"}' 2>&1) || true
+    if echo "$output" | grep -qE "created|exists"; then log_success "Service Set 'set-stream' OK"; fi
+    
+    director_create "service" "Stream" \
+        '{"object_name":"Stream","object_type":"object","imports":["svc-icecast"],"service_set":"set-stream"}'
 }
 
 # === MAIN ===
+log_info "=== Director Objects Setup ==="
 create_commands
 create_datafields
 create_host_templates
 create_service_templates
 create_hostgroups
-create_servicegroups
 create_service_sets
 
 log_success "Director Objects abgeschlossen"
+echo ""
+echo "════════════════════════════════════════════════════════════════"
+echo "                    ONBOARDING CHEATSHEET"
+echo "════════════════════════════════════════════════════════════════"
+echo ""
+echo "HOST TEMPLATES (8):                SERVICE SETS:"
+echo "  tpl-linux    → Linux + NRPE        set-nrpe    (Disk,Load,Mem,Procs)"
+echo "  tpl-windows  → Windows + Agent     set-ping    (nur Ping)"
+echo "  tpl-macos    → macOS + NRPE        set-web     (HTTPS + SSL Cert)"
+echo "  tpl-switch   → Netzwerk Switch     set-epiphan (Web UI)"
+echo "  tpl-av-device→ AV Geräte           set-stream  (Icecast Check)"
+echo "  tpl-epiphan  → Epiphan Pearl"
+echo "  tpl-stream   → Stream Server"
+echo "  tpl-web      → Web Plattform"
+echo ""
+echo "AUTOMATISCHE GRUPPIERUNG via vars:"
+echo "  vars.device=\"epiphan\"  → grp-pearls"
+echo "  vars.device=\"av\"       → grp-av-devices"
+echo "  vars.device=\"switch\"   → grp-switches"
+echo "  vars.device=\"web\"      → grp-web"
+echo "  vars.device=\"icecast\"  → grp-streaming"
+echo "  vars.studio=\"1\"        → grp-studio1"
+echo "  vars.studio=\"2\"        → grp-studio2"
+echo "  vars.os=\"Linux|Windows|macOS\" → grp-linux|windows|macos"
+echo ""
+echo "BEISPIEL - Host anlegen:"
+echo "  Name: pearl-studio1-cam1"
+echo "  Template: tpl-epiphan"
+echo "  Address: 192.168.1.100"
+echo "  Vars: studio=1"
+echo "  Service Set: set-epiphan"
+echo "  → Wird automatisch in grp-pearls UND grp-studio1 einsortiert"
+echo "════════════════════════════════════════════════════════════════"

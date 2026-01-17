@@ -3,7 +3,10 @@
 
 services:
   icinga2:
-    image: icinga/icinga2:latest
+    build:
+      context: ./docker/icinga2
+      dockerfile: Dockerfile
+    image: icinga2-custom:latest
     container_name: icinga2
     hostname: icinga2
     restart: unless-stopped
@@ -12,6 +15,10 @@ services:
       - ICINGA_CN=icinga2
     volumes:
       - icinga2-data:/data
+      # Notification Konfiguration
+      - ./config/icinga2/conf.d/notifications.conf:/data/etc/icinga2/conf.d/notifications.conf:ro
+      - ./config/icinga2/scripts:/data/etc/icinga2/scripts:ro
+      - ./config/msmtp/msmtprc:/etc/msmtprc:ro
     networks:
       - icinga-network
     ports:

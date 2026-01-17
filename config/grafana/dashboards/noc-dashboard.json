@@ -1,0 +1,305 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "liveNow": true,
+  "panels": [
+    {
+      "gridPos": { "h": 2, "w": 24, "x": 0, "y": 0 },
+      "id": 100,
+      "options": {
+        "content": "<div style=\"display:flex;justify-content:space-between;align-items:center;padding:10px 20px;background:#1a1a2e;border-radius:8px\">\n  <h1 style=\"margin:0;color:#fff;font-size:28px\">🎙️ RADIO NOC DASHBOARD</h1>\n  <div style=\"font-size:24px;color:#888\">${__from:date:HH:mm:ss}</div>\n</div>",
+        "mode": "html"
+      },
+      "title": "",
+      "transparent": true,
+      "type": "text"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "PostgreSQL-IcingaDB" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [
+            { "options": { "0": { "color": "green", "text": "🟢 ALLES OK" } }, "type": "value" }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 1 }
+            ]
+          }
+        }
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 2 },
+      "id": 1,
+      "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "value" },
+      "targets": [{ "rawSql": "SELECT COUNT(*) FROM host_state WHERE soft_state = 1", "refId": "A", "format": "table" }],
+      "title": "Hosts DOWN",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "PostgreSQL-IcingaDB" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 1 }, { "color": "red", "value": 5 }] }
+        }
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 2 },
+      "id": 2,
+      "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "value" },
+      "targets": [{ "rawSql": "SELECT COUNT(*) FROM service_state WHERE soft_state = 2", "refId": "A", "format": "table" }],
+      "title": "Services CRITICAL",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "PostgreSQL-IcingaDB" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 1 }] }
+        }
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 2 },
+      "id": 3,
+      "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "value" },
+      "targets": [{ "rawSql": "SELECT COUNT(*) FROM service_state WHERE soft_state = 1", "refId": "A", "format": "table" }],
+      "title": "Services WARNING",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "PostgreSQL-IcingaDB" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "green" },
+          "unit": "none"
+        }
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 2 },
+      "id": 4,
+      "options": { "colorMode": "value", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "value" },
+      "targets": [{ "rawSql": "SELECT COUNT(*) FROM host WHERE active = 'y'", "refId": "A", "format": "table" }],
+      "title": "Total Hosts",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "PostgreSQL-IcingaDB" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "custom": { "align": "auto", "displayMode": "color-background-solid", "filterable": false },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }] }
+        },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "Host" }, "properties": [{ "id": "custom.width", "value": 200 }] },
+          { "matcher": { "id": "byName", "options": "Service" }, "properties": [{ "id": "custom.width", "value": 200 }] }
+        ]
+      },
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 6 },
+      "id": 10,
+      "options": { "showHeader": true, "cellHeight": "sm", "footer": { "show": false } },
+      "targets": [{
+        "rawSql": "SELECT h.name as \"Host\", s.name as \"Service\", ss.output as \"Output\", ss.last_state_change as \"Since\" FROM service_state ss JOIN service s ON ss.id = s.id JOIN host h ON s.host_id = h.id WHERE ss.soft_state >= 1 ORDER BY ss.soft_state DESC, ss.last_state_change ASC LIMIT 10",
+        "refId": "A", "format": "table"
+      }],
+      "title": "🚨 Aktuelle Probleme",
+      "type": "table"
+    },
+    {
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 12 },
+      "id": 20,
+      "title": "🖥️ INFRASTRUKTUR",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "PostgreSQL-IcingaDB" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [{ "options": { "0": { "color": "green", "text": "UP" }, "1": { "color": "red", "text": "DOWN" } }, "type": "value" }],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] }
+        }
+      },
+      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 13 },
+      "id": 21,
+      "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "auto", "orientation": "horizontal", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": true }, "textMode": "value_and_name" },
+      "targets": [{
+        "rawSql": "SELECT h.name, COALESCE(hs.soft_state, 0) as state FROM host h LEFT JOIN host_state hs ON h.id = hs.id WHERE h.name LIKE '%srv%' OR EXISTS (SELECT 1 FROM host_customvar hc WHERE hc.host_id = h.id AND hc.name = 'os' AND hc.value IN ('\"Linux\"', '\"Windows\"')) ORDER BY h.name LIMIT 12",
+        "refId": "A", "format": "table"
+      }],
+      "title": "Server",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "PostgreSQL-IcingaDB" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [{ "options": { "0": { "color": "green", "text": "UP" }, "1": { "color": "red", "text": "DOWN" } }, "type": "value" }],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] }
+        }
+      },
+      "gridPos": { "h": 6, "w": 8, "x": 8, "y": 13 },
+      "id": 22,
+      "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "auto", "orientation": "horizontal", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": true }, "textMode": "value_and_name" },
+      "targets": [{
+        "rawSql": "SELECT h.name, COALESCE(hs.soft_state, 0) as state FROM host h LEFT JOIN host_state hs ON h.id = hs.id WHERE EXISTS (SELECT 1 FROM host_customvar hc WHERE hc.host_id = h.id AND hc.name = 'os' AND hc.value = '\"macOS\"') ORDER BY h.name LIMIT 12",
+        "refId": "A", "format": "table"
+      }],
+      "title": "macOS Clients",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "PostgreSQL-IcingaDB" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [{ "options": { "0": { "color": "green", "text": "✓" }, "1": { "color": "red", "text": "✗" } }, "type": "value" }],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] }
+        }
+      },
+      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 13 },
+      "id": 23,
+      "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "auto", "orientation": "horizontal", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": true }, "textMode": "value_and_name" },
+      "targets": [{
+        "rawSql": "SELECT h.name, COALESCE(hs.soft_state, 0) as state FROM host h LEFT JOIN host_state hs ON h.id = hs.id JOIN hostgroup_member hgm ON h.id = hgm.host_id JOIN hostgroup hg ON hgm.hostgroup_id = hg.id WHERE hg.name = 'grp-switches' ORDER BY h.name LIMIT 8",
+        "refId": "A", "format": "table"
+      }],
+      "title": "Switches",
+      "type": "stat"
+    },
+    {
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 19 },
+      "id": 30,
+      "title": "📹 EPIPHAN PEARLS",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "PostgreSQL-IcingaDB" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [{ "options": { "0": { "color": "green", "text": "●" }, "1": { "color": "red", "text": "●" } }, "type": "value" }],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] },
+          "custom": { "displayMode": "lcd-gauge" }
+        }
+      },
+      "gridPos": { "h": 5, "w": 24, "x": 0, "y": 20 },
+      "id": 31,
+      "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "auto", "orientation": "vertical", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": true }, "textMode": "name" },
+      "targets": [{
+        "rawSql": "SELECT h.name, COALESCE(hs.soft_state, 0) as state FROM host h LEFT JOIN host_state hs ON h.id = hs.id JOIN hostgroup_member hgm ON h.id = hgm.host_id JOIN hostgroup hg ON hgm.hostgroup_id = hg.id WHERE hg.name = 'grp-pearls' ORDER BY h.name LIMIT 30",
+        "refId": "A", "format": "table"
+      }],
+      "title": "",
+      "transparent": true,
+      "type": "stat"
+    },
+    {
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 25 },
+      "id": 40,
+      "title": "🎙️ RADIO STUDIOS",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "PostgreSQL-IcingaDB" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [{ "options": { "0": { "color": "green", "text": "OK" }, "1": { "color": "red", "text": "FAIL" } }, "type": "value" }],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] }
+        }
+      },
+      "gridPos": { "h": 5, "w": 12, "x": 0, "y": 26 },
+      "id": 41,
+      "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "auto", "orientation": "horizontal", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": true }, "textMode": "value_and_name" },
+      "targets": [{
+        "rawSql": "SELECT h.name, COALESCE(hs.soft_state, 0) as state FROM host h LEFT JOIN host_state hs ON h.id = hs.id JOIN hostgroup_member hgm ON h.id = hgm.host_id JOIN hostgroup hg ON hgm.hostgroup_id = hg.id WHERE hg.name = 'grp-studio1' ORDER BY h.name",
+        "refId": "A", "format": "table"
+      }],
+      "title": "Studio 1",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "PostgreSQL-IcingaDB" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [{ "options": { "0": { "color": "green", "text": "OK" }, "1": { "color": "red", "text": "FAIL" } }, "type": "value" }],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] }
+        }
+      },
+      "gridPos": { "h": 5, "w": 12, "x": 12, "y": 26 },
+      "id": 42,
+      "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "auto", "orientation": "horizontal", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": true }, "textMode": "value_and_name" },
+      "targets": [{
+        "rawSql": "SELECT h.name, COALESCE(hs.soft_state, 0) as state FROM host h LEFT JOIN host_state hs ON h.id = hs.id JOIN hostgroup_member hgm ON h.id = hgm.host_id JOIN hostgroup hg ON hgm.hostgroup_id = hg.id WHERE hg.name = 'grp-studio2' ORDER BY h.name",
+        "refId": "A", "format": "table"
+      }],
+      "title": "Studio 2",
+      "type": "stat"
+    },
+    {
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 31 },
+      "id": 50,
+      "title": "🌐 WEB & STREAMING",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "PostgreSQL-IcingaDB" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [{ "options": { "0": { "color": "green", "text": "ONLINE" }, "1": { "color": "yellow", "text": "SLOW" }, "2": { "color": "red", "text": "OFFLINE" } }, "type": "value" }],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 1 }, { "color": "red", "value": 2 }] }
+        }
+      },
+      "gridPos": { "h": 4, "w": 12, "x": 0, "y": 32 },
+      "id": 51,
+      "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "auto", "orientation": "horizontal", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": true }, "textMode": "value_and_name" },
+      "targets": [{
+        "rawSql": "SELECT h.name, COALESCE(hs.soft_state, 0) as state FROM host h LEFT JOIN host_state hs ON h.id = hs.id WHERE EXISTS (SELECT 1 FROM host_customvar hc WHERE hc.host_id = h.id AND hc.name = 'device_type' AND hc.value = '\"web\"') ORDER BY h.name",
+        "refId": "A", "format": "table"
+      }],
+      "title": "Web Plattformen",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "PostgreSQL-IcingaDB" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [{ "options": { "0": { "color": "green", "text": "🔴 LIVE" }, "1": { "color": "red", "text": "⚫ OFFLINE" } }, "type": "value" }],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] }
+        }
+      },
+      "gridPos": { "h": 4, "w": 12, "x": 12, "y": 32 },
+      "id": 52,
+      "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "horizontal", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": true }, "textMode": "value_and_name" },
+      "targets": [{
+        "rawSql": "SELECT h.name, COALESCE(hs.soft_state, 0) as state FROM host h LEFT JOIN host_state hs ON h.id = hs.id WHERE EXISTS (SELECT 1 FROM host_customvar hc WHERE hc.host_id = h.id AND hc.name = 'device_type' AND (hc.value = '\"stream-server\"' OR hc.value = '\"stl-codec\"')) ORDER BY h.name",
+        "refId": "A", "format": "table"
+      }],
+      "title": "Streaming / STL",
+      "type": "stat"
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": ["noc", "radio", "overview"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": { "hidden": true },
+  "timezone": "browser",
+  "title": "NOC Dashboard",
+  "uid": "noc-main",
+  "version": 1,
+  "weekStart": "monday"
+}
