@@ -1,5 +1,6 @@
 # Icinga2 mit msmtp für Email-Benachrichtigungen
-FROM icinga/icinga2:latest
+# Base Image Version: 2.15.1
+FROM icinga/icinga2:2.15.1
 
 # msmtp installieren für Email-Versand
 RUN apt-get update && \

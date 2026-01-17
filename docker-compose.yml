@@ -1,5 +1,15 @@
 # Production - mit Traefik (extern) für SSL
 # Nutzung: docker compose up -d
+#
+# Image Versionen (Stand: Januar 2026):
+#   icinga2:          2.15.1
+#   icingadb:         1.5.1
+#   icingaweb2:       2.12.1
+#   postgres:         15-alpine
+#   redis:            7-alpine
+#   grafana:          12.3.1
+#   prometheus:       3.9.1
+#   blackbox-exporter: 0.28.0
 
 services:
   icinga2:
@@ -41,7 +51,7 @@ services:
       retries: 5
 
   icingadb:
-    image: icinga/icingadb:latest
+    image: icinga/icingadb:1.5.1
     container_name: icingadb
     restart: unless-stopped
     environment:
@@ -118,7 +128,7 @@ services:
     shm_size: 256mb
 
   icingaweb2:
-    image: icinga/icingaweb2:latest
+    image: icinga/icingaweb2:2.12.1
     container_name: icingaweb2
     restart: unless-stopped
     labels:
@@ -195,7 +205,7 @@ services:
 
   # Director Daemon - überwacht Deployment-Status und Background-Jobs
   director-daemon:
-    image: icinga/icingaweb2:latest
+    image: icinga/icingaweb2:2.12.1
     container_name: director-daemon
     restart: unless-stopped
     entrypoint: ["/bin/bash", "-c"]
@@ -231,7 +241,7 @@ services:
       - postgres
 
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:12.3.1
     container_name: grafana
     restart: unless-stopped
     labels:
@@ -255,7 +265,7 @@ services:
       - prometheus
 
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v3.9.1
     container_name: prometheus
     restart: unless-stopped
     command:
@@ -270,7 +280,7 @@ services:
       - icinga-network
 
   blackbox-exporter:
-    image: prom/blackbox-exporter:latest
+    image: prom/blackbox-exporter:v0.28.0
     container_name: blackbox-exporter
     restart: unless-stopped
     volumes:
