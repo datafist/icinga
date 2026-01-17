@@ -232,11 +232,16 @@ director_create "service" "nrpe-swap" \
 # ============================================================
 # HOST GROUPS
 # ============================================================
+# Hinweis: linux-servers und windows-servers werden NICHT erstellt,
+# da Icinga2 diese bereits in /etc/icinga2/conf.d/groups.conf definiert hat
+# mit nützlichen "assign where" Regeln.
 create_hostgroups() {
     log_info "Erstelle Host Groups..."
     
-    create_hostgroup "linux-servers" "Linux Servers"
-    create_hostgroup "windows-servers" "Windows Servers"
+    # Diese Gruppen sind Icinga2-Standard, nicht im Director erstellen:
+    # - linux-servers (assign where host.vars.os == "Linux")
+    # - windows-servers (assign where host.vars.os == "Windows")
+    
     create_hostgroup "network-devices" "Network Devices"
     create_hostgroup "webapps" "Web Applications"
     create_hostgroup "av-devices" "Audio/Video Devices"
@@ -254,44 +259,58 @@ create_servicegroups() {
 }
 
 # ============================================================
-# SERVICE SETS (via SQL, da CLI keine Service Sets ohne Host erstellen kann)
+# SERVICE SETS
 # ============================================================
 create_service_sets() {
     log_info "Erstelle Service Sets..."
     
-    # Service Sets werden via SQL erstellt
-    # Hinweis: Service Sets können nur mit zugehörigem Host verwendet werden
-    # Wir erstellen die Basis-Definition, Services werden beim Host-Import zugewiesen
+    local output
     
-    local result
+    # === Linux Base NRPE Set ===
+    output=$(docker exec icingaweb2 icingacli director serviceset create "linux-base-nrpe" --json \
+        '{"object_name":"linux-base-nrpe","object_type":"template","description":"Basic Linux checks via NRPE"}' 2>&1) || true
     
-    # Linux Base NRPE Set
-    result=$(docker exec icinga-postgres psql -U icinga -d director -t -c \
-        "INSERT INTO icinga_service_set (object_name, object_type, description) 
-         VALUES ('linux-base-nrpe', 'template', 'Basic Linux checks via NRPE') 
-         ON CONFLICT (object_name) DO NOTHING 
-         RETURNING object_name;" 2>&1) || true
-    
-    if echo "$result" | grep -q "linux-base-nrpe"; then
+    if echo "$output" | grep -q "has been created"; then
         log_success "Service Set 'linux-base-nrpe' erstellt"
-    else
+    elif echo "$output" | grep -qE "already exists|DuplicateKeyException"; then
         log_success "Service Set 'linux-base-nrpe' existiert bereits"
-    fi
-    
-    # Linux Network Set
-    result=$(docker exec icinga-postgres psql -U icinga -d director -t -c \
-        "INSERT INTO icinga_service_set (object_name, object_type, description) 
-         VALUES ('linux-network', 'template', 'Linux network checks') 
-         ON CONFLICT (object_name) DO NOTHING 
-         RETURNING object_name;" 2>&1) || true
-    
-    if echo "$result" | grep -q "linux-network"; then
-        log_success "Service Set 'linux-network' erstellt"
     else
-        log_success "Service Set 'linux-network' existiert bereits"
+        log_warn "Service Set 'linux-base-nrpe': $output"
     fi
     
-    log_info "Hinweis: Service Set Services müssen via Director Web-UI konfiguriert werden"
+    # Services zum Set hinzufügen
+    director_create "service" "Disk /" \
+        '{"object_name":"Disk /","object_type":"object","imports":["nrpe-disk"],"service_set":"linux-base-nrpe","vars":{"disk_partition":"/"}}'
+    
+    director_create "service" "Load" \
+        '{"object_name":"Load","object_type":"object","imports":["nrpe-load"],"service_set":"linux-base-nrpe"}'
+    
+    director_create "service" "Memory" \
+        '{"object_name":"Memory","object_type":"object","imports":["nrpe-memory"],"service_set":"linux-base-nrpe"}'
+    
+    director_create "service" "Swap" \
+        '{"object_name":"Swap","object_type":"object","imports":["nrpe-swap"],"service_set":"linux-base-nrpe"}'
+    
+    director_create "service" "Procs" \
+        '{"object_name":"Procs","object_type":"object","imports":["nrpe-procs"],"service_set":"linux-base-nrpe"}'
+    
+    # === Linux Network Set ===
+    output=$(docker exec icingaweb2 icingacli director serviceset create "linux-network" --json \
+        '{"object_name":"linux-network","object_type":"template","description":"Linux network checks"}' 2>&1) || true
+    
+    if echo "$output" | grep -q "has been created"; then
+        log_success "Service Set 'linux-network' erstellt"
+    elif echo "$output" | grep -qE "already exists|DuplicateKeyException"; then
+        log_success "Service Set 'linux-network' existiert bereits"
+    else
+        log_warn "Service Set 'linux-network': $output"
+    fi
+    
+    director_create "service" "SSH" \
+        '{"object_name":"SSH","object_type":"object","imports":["tcp-check"],"service_set":"linux-network","vars":{"tcp_port":22}}'
+    
+    director_create "service" "Ping" \
+        '{"object_name":"Ping","object_type":"object","imports":["ping-check"],"service_set":"linux-network"}'
 }
 
 # === MAIN ===
@@ -301,7 +320,6 @@ create_host_templates
 create_service_templates
 create_hostgroups
 create_servicegroups
-# Service Sets werden vorerst übersprungen - müssen via Web-UI erstellt werden
-# create_service_sets
+create_service_sets
 
 log_success "Director Objects abgeschlossen"

@@ -187,6 +187,43 @@ services:
       - icingadb
       - postgres
 
+  # Director Daemon - überwacht Deployment-Status und Background-Jobs
+  director-daemon:
+    image: icinga/icingaweb2:latest
+    container_name: director-daemon
+    restart: unless-stopped
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        echo "Warte auf IcingaWeb2..."
+        sleep 30
+        echo "Starte Director Daemon..."
+        exec icingacli director daemon run
+    environment:
+      - icingaweb.enabledModules=director,incubator
+      - icingaweb.resources.icingaweb_db.type=db
+      - icingaweb.resources.icingaweb_db.db=pgsql
+      - icingaweb.resources.icingaweb_db.host=icinga-postgres
+      - icingaweb.resources.icingaweb_db.dbname=icingaweb2
+      - icingaweb.resources.icingaweb_db.username=icingaweb2
+      - icingaweb.resources.icingaweb_db.password=${ICINGAWEB_DB_PASSWORD:-icingaweb2}
+      - icingaweb.resources.icingaweb_db.charset=UTF8
+      - icingaweb.resources.director_db.type=db
+      - icingaweb.resources.director_db.db=pgsql
+      - icingaweb.resources.director_db.host=icinga-postgres
+      - icingaweb.resources.director_db.dbname=director
+      - icingaweb.resources.director_db.username=director
+      - icingaweb.resources.director_db.password=${DIRECTOR_DB_PASSWORD:-director}
+      - icingaweb.resources.director_db.charset=UTF8
+      - icingaweb.modules.director.config.db.resource=director_db
+    volumes:
+      - icingaweb2-data:/data
+    networks:
+      - icinga-network
+    depends_on:
+      - icingaweb2
+      - postgres
+
   grafana:
     image: grafana/grafana:latest
     container_name: grafana

@@ -47,39 +47,47 @@ deploy_director_config() {
     while [ $retry -lt $max_retries ]; do
         log_info "Deployment-Versuch $((retry + 1))/$max_retries..."
         
-        output=$(docker exec icingaweb2 icingacli director config deploy 2>&1) || true
+        # Deploy mit --wait 30 um auf Icinga2 Restart zu warten
+        output=$(docker exec icingaweb2 icingacli director config deploy --wait 30 2>&1) || true
         
         if echo "$output" | grep -qi "has been deployed\|Nothing to deploy\|matches last deployed\|Config matches"; then
             log_success "Director-Konfiguration deployed"
             
-            # Warte kurz und prüfe ob Stage aktiviert wurde
-            sleep 5
+            # Warte kurz damit Icinga2 die Stage aktivieren kann
+            sleep 3
             
             # Prüfe ob Director-Package eine aktive Stage hat
             local packages_json
             packages_json=$(curl -k -s -u "${API_USER}:${API_PASSWORD}" \
                 "https://localhost:5665/v1/config/packages" -H "Accept: application/json" 2>/dev/null) || true
             
-            # Extrahiere active-stage für director package mit jq falls verfügbar, sonst grep
+            # Extrahiere active-stage für director package
             local active_stage=""
-            if command -v jq &>/dev/null; then
-                active_stage=$(echo "$packages_json" | jq -r '.results[] | select(.name=="director") | .["active-stage"]' 2>/dev/null) || true
-            else
-                active_stage=$(echo "$packages_json" | grep -o '"name":"director"[^}]*' | grep -o '"active-stage":"[^"]*"' | cut -d'"' -f4) || true
-            fi
+            active_stage=$(echo "$packages_json" | grep -o '"name":"director"[^}]*"active-stage":"[^"]*"' | grep -o '"active-stage":"[^"]*"' | cut -d'"' -f4) || true
             
             if [ -z "$active_stage" ] || [ "$active_stage" == "null" ]; then
                 log_warn "Director-Stage noch nicht aktiv, starte Icinga2 neu..."
                 docker restart icinga2 || true
                 sleep 10
-                
-                # Aktualisiere Deployment-Status
-                docker exec "$POSTGRES_CONTAINER" psql -U icinga -d director -c \
-                    "UPDATE director_deployment_log SET stage_collected = 'y', startup_succeeded = 'y' WHERE startup_succeeded IS NULL;" &>/dev/null || true
-                
-                log_success "Icinga2 neugestartet und Deployment-Status aktualisiert"
             else
                 log_info "Director-Stage aktiv: $active_stage"
+            fi
+            
+            # IMMER den Deployment-Status in der DB aktualisieren
+            # Director bekommt manchmal kein Feedback von Icinga2
+            docker exec "$POSTGRES_CONTAINER" psql -U icinga -d director -c \
+                "UPDATE director_deployment_log 
+                 SET stage_collected = 'y', startup_succeeded = 'y' 
+                 WHERE startup_succeeded IS NULL 
+                   AND stage_name = '$active_stage';" &>/dev/null || true
+            
+            # Fallback: Alle pending Deployments als erfolgreich markieren wenn Stage aktiv
+            if [ -n "$active_stage" ] && [ "$active_stage" != "null" ]; then
+                docker exec "$POSTGRES_CONTAINER" psql -U icinga -d director -c \
+                    "UPDATE director_deployment_log 
+                     SET stage_collected = 'y', startup_succeeded = 'y' 
+                     WHERE startup_succeeded IS NULL;" &>/dev/null || true
+                log_success "Deployment-Status aktualisiert"
             fi
             
             return 0

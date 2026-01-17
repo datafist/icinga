@@ -139,6 +139,25 @@ log_success "API-User konfiguriert"
 wait_for "Icinga 2 API" "curl -k -s -o /dev/null -w '%{http_code}' -u ${ICINGA_API_USER}:${ICINGA_API_PASSWORD} https://localhost:5665/v1/status | grep -q 200"
 wait_for "IcingaWeb2" "curl -s -o /dev/null -w '%{http_code}' http://localhost:8080 | grep -qE '200|302'"
 
+# Prüfe ob Director-Daemon Container läuft (wichtig für Deployment-Status)
+if docker ps --format '{{.Names}}' | grep -q "director-daemon"; then
+    log_success "Director-Daemon Container läuft"
+else
+    log_info "Director-Daemon Container wird gestartet..."
+    # Ermittle welche compose-Datei verwendet wird
+    if [[ -f "${SCRIPT_DIR}/../docker-compose.dev.yml" ]]; then
+        (cd "${SCRIPT_DIR}/.." && docker compose -f docker-compose.dev.yml up -d director-daemon) &>/dev/null || true
+    else
+        (cd "${SCRIPT_DIR}/.." && docker compose up -d director-daemon) &>/dev/null || true
+    fi
+    sleep 5
+    if docker ps --format '{{.Names}}' | grep -q "director-daemon"; then
+        log_success "Director-Daemon Container gestartet"
+    else
+        log_info "Director-Daemon nicht verfügbar - Deployment-Status wird manuell gesetzt"
+    fi
+fi
+
 # Teil 1: Director Kickstart
 run_part "${SCRIPT_DIR}/01-director-kickstart.sh" "Director Kickstart"
 
